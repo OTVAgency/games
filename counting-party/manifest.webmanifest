@@ -1,0 +1,14 @@
+{
+  "name": "Cay's Counting Party",
+  "short_name": "Counting Party",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFF3D6",
+  "theme_color": "#FFF3D6",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

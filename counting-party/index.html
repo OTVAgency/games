@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover is paired with the env(safe-area-inset-*) padding below -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Cay's Counting Party</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Counting Party">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFF3D6">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg1:#FFF3D6; --bg2:#FFD9A0; --ink:#3A2A1E;
+    --pink:#FF6FA3; --teal:#19B5A5; --blue:#3D8BFF; --yellow:#FFC93C; --green:#3CCB6B; --purple:#9B6BFF;
+    --pad:clamp(10px,2.5vmin,24px);
+    --bar:64px; /* top-bar button size: 64px minimum tap target */
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;touch-action:manipulation}
+  body{
+    font-family:'Fredoka',system-ui,-apple-system,sans-serif;color:var(--ink);
+    background:radial-gradient(circle at 15% 10%,#FFE9F1 0 18%,transparent 19%),
+               radial-gradient(circle at 88% 85%,#D8F6F1 0 22%,transparent 23%),
+               linear-gradient(160deg,var(--bg1),var(--bg2));
+  }
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
+    padding:max(var(--pad),env(safe-area-inset-top)) max(var(--pad),env(safe-area-inset-right))
+            max(var(--pad),env(safe-area-inset-bottom)) max(var(--pad),env(safe-area-inset-left))}
+  .screen.on{display:flex}
+  /* game and finale sit under the shared top bar */
+  #game,#win{padding-top:calc(max(var(--pad),env(safe-area-inset-top)) + var(--bar) + 6px)}
+  button{font-family:inherit;color:inherit;border:0;cursor:pointer}
+  img{-webkit-user-drag:none;pointer-events:none}
+
+  /* ---------- characters ----------
+     Sprites are 1024x1024 with a lot of empty margin. .sprite is a window onto the
+     middle of the image (x 256-768, y 56-960), shared by idle and cheer so the
+     figure does not jump or resize when the pose swaps. Size is set by --h. */
+  .char{display:flex;flex-direction:column;align-items:center;width:calc(var(--h)*.566);flex:none}
+  .sprite{position:relative;width:100%;aspect-ratio:512/904;overflow:hidden}
+  .sprite img{position:absolute;width:200%;height:113.274%;left:-50%;top:-6.195%;max-width:none}
+  .char svg{width:100%;height:auto;display:block;filter:drop-shadow(0 6px 0 rgba(58,42,30,.15))}
+  .char .name{font-weight:700;font-size:clamp(14px,2.8vmin,26px);background:#fff;border-radius:999px;padding:2px 10px;
+    margin-top:2px;box-shadow:0 4px 0 rgba(58,42,30,.15);white-space:nowrap}
+  .bob{animation:bob 2.4s ease-in-out infinite}
+  .jump{animation:jump .5s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(2deg)}}
+  @keyframes jump{0%,100%{transform:translateY(0)}50%{transform:translateY(-22px) scale(1.04)}}
+
+  /* ---------- home ---------- */
+  #home{justify-content:center;gap:clamp(8px,2.4vmin,22px)}
+  h1{margin:0;text-align:center;font-size:clamp(32px,7.5vmin,80px);line-height:1;color:var(--pink);
+     text-shadow:0 5px 0 #fff,0 9px 0 rgba(58,42,30,.15)}
+  h1 small{display:block;font-size:.5em;color:var(--teal)}
+  .family{display:flex;align-items:flex-end;justify-content:center;gap:clamp(14px,2.2vmin,24px);width:100%}
+  .family .char{--h:clamp(170px,40vmin,370px)}
+  .family .char.kid{--h:clamp(125px,29vmin,270px)}
+  #win .family .char{--h:clamp(140px,30vmin,280px)}
+  #win .family .char.kid{--h:clamp(104px,22vmin,205px)}
+  .family .char:nth-child(2){animation-delay:.17s}
+  .family .char:nth-child(3){animation-delay:.34s}
+  .big-btn{background:var(--green);color:#fff;font-weight:700;font-size:clamp(30px,6.5vmin,64px);min-height:64px;
+    padding:.25em 1.2em;border-radius:999px;box-shadow:0 10px 0 #249C4C;animation:pulse 1.4s ease-in-out infinite;flex:none}
+  .big-btn:active{transform:translateY(6px);box-shadow:0 4px 0 #249C4C;animation:none}
+  .big-btn[disabled]{background:#C9B7A3;box-shadow:0 10px 0 #A8957F;animation:none}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+
+  /* ---------- shared top bar (game + finale) ---------- */
+  #bar{position:fixed;z-index:5;display:none;align-items:center;gap:8px;
+    top:max(var(--pad),env(safe-area-inset-top));
+    left:max(var(--pad),env(safe-area-inset-left));right:max(var(--pad),env(safe-area-inset-right))}
+  body[data-screen="game"] #bar,body[data-screen="win"] #bar{display:flex}
+  body[data-screen="win"] .dots{visibility:hidden}
+  .icon-btn{position:relative;width:var(--bar);height:var(--bar);border-radius:50%;background:#fff;font-size:30px;
+    box-shadow:0 4px 0 rgba(58,42,30,.18);flex:none;display:grid;place-items:center}
+  .icon-btn:active{transform:translateY(3px)}
+  .icon-btn.off{background:#EADFD2}
+  .icon-btn.off::after{content:"";position:absolute;left:14%;right:14%;top:50%;height:6px;margin-top:-3px;
+    background:#E5484D;border-radius:3px;transform:rotate(-45deg);box-shadow:0 0 0 2px #fff}
+  /* dots shrink to share whatever width is left between the buttons */
+  .dots{flex:1;min-width:0;display:flex;justify-content:center;gap:clamp(2px,1vmin,10px);container-type:inline-size}
+  .dot{flex:1 1 0;min-width:0;max-width:44px;aspect-ratio:1;border-radius:50%;background:#fff;
+    display:grid;place-items:center;font-weight:700;font-size:min(22px,5cqw);color:#C9B7A3;box-shadow:0 3px 0 rgba(58,42,30,.12)}
+  .dot.done{background:var(--green);color:#fff}
+  .dot.now{background:var(--yellow);color:var(--ink);transform:scale(1.15)}
+
+  /* ---------- game ---------- */
+  .hostrow{display:flex;align-items:center;justify-content:center;gap:clamp(6px,2.5vmin,28px);width:100%;max-width:980px;flex:none}
+  #host{--h:clamp(130px,32vmin,290px)}
+  #host.kid{--h:clamp(108px,26vmin,236px)}
+  .bubble{position:relative;background:#fff;border-radius:28px;padding:.35em .8em;font-weight:700;
+    font-size:clamp(20px,4.6vmin,46px);box-shadow:0 6px 0 rgba(58,42,30,.15);text-align:center}
+  .bubble::before{content:"";position:absolute;left:-14px;top:50%;margin-top:-12px;border:12px solid transparent;border-right-color:#fff;border-left:0}
+  #bigNum{flex:none;min-width:1.2em;text-align:center;font-weight:700;line-height:1;
+    font-size:clamp(64px,20vmin,200px);color:var(--blue);text-shadow:0 6px 0 #fff,0 11px 0 rgba(58,42,30,.15)}
+  #bigNum.pop{animation:pop .35s ease-out}
+  @keyframes pop{0%{transform:scale(.4)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
+
+  #items{flex:1;min-height:0;width:100%;max-width:860px;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;
+    gap:clamp(8px,2.2vmin,22px);padding:6px 0}
+  #items:not(.few){max-width:calc(5*clamp(64px,14vmin,128px) + 5*clamp(8px,2.2vmin,22px))}
+  .item{--s:clamp(64px,14vmin,128px);position:relative;width:var(--s);height:var(--s);border-radius:28%;
+    background:#fff;box-shadow:0 7px 0 rgba(58,42,30,.18);font-size:calc(var(--s)*.62);line-height:1;
+    display:grid;place-items:center;animation:wiggle 1.8s ease-in-out infinite}
+  .few .item{--s:clamp(96px,22vmin,190px)}
+  .item:active{transform:scale(.92)}
+  .item.done{animation:tapped .4s ease-out;background:var(--c);box-shadow:0 7px 0 rgba(58,42,30,.25);pointer-events:none}
+  .item .badge{position:absolute;right:-8px;top:-8px;width:42%;height:42%;border-radius:50%;background:var(--ink);color:#fff;
+    font-family:inherit;font-weight:700;font-size:calc(var(--s)*.26);display:none;place-items:center;border:3px solid #fff}
+  .item.done .badge{display:grid}
+  @keyframes wiggle{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+  @keyframes tapped{0%{transform:scale(1)}40%{transform:scale(1.3) rotate(10deg)}100%{transform:scale(1)}}
+
+  /* ---------- finale ---------- */
+  #win{justify-content:center;gap:clamp(6px,2vmin,18px)}
+  .row10{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(5px,1.2vmin,12px);max-width:900px;flex:none}
+  .row10 button{width:clamp(64px,8.4vmin,80px);height:clamp(64px,8.4vmin,80px);border-radius:24%;color:#fff;font-weight:700;
+    font-size:clamp(28px,4.6vmin,44px);box-shadow:0 6px 0 rgba(58,42,30,.22)}
+  .row10 button:active{transform:translateY(4px)}
+
+  .confetti{position:fixed;top:-20px;width:14px;height:20px;border-radius:4px;pointer-events:none;z-index:9;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+
+  @media (prefers-reduced-motion:reduce){.bob,.item,.big-btn{animation:none}}
+</style>
+</head>
+<body data-screen="home">
+
+<header id="bar">
+  <button class="icon-btn" id="goHome" aria-label="Home">🏠</button>
+  <div class="dots" id="dots"></div>
+  <button class="icon-btn" id="musicBtn" aria-label="Music">🎵</button>
+  <button class="icon-btn" id="voiceBtn" aria-label="Voice and sound effects">🔊</button>
+</header>
+
+<section id="home" class="screen on">
+  <h1>Cay's<small>Counting Party</small></h1>
+  <div class="family" id="homeFamily"></div>
+  <button class="big-btn" id="play" disabled>▶ Play</button>
+</section>
+
+<section id="game" class="screen">
+  <div class="hostrow">
+    <div id="host" class="char bob"></div>
+    <div class="bubble" id="bubble"></div>
+    <div id="bigNum"></div>
+  </div>
+  <div id="items"></div>
+</section>
+
+<section id="win" class="screen">
+  <h1>You counted<small>to 10!</small></h1>
+  <div class="family" id="winFamily"></div>
+  <div class="row10" id="row10"></div>
+  <button class="big-btn" id="again">↻ Again</button>
+</section>
+
+<script>
+/* =====================================================================
+   EDIT ME: names, what gets counted, and the fallback lines.
+   ===================================================================== */
+const KID_NAME = 'Cay';
+// `id` picks the SVG fallback drawing; `file` is the PNG prefix in assets/img.
+// The prototype id "kid" maps to the "cay_*" files on purpose.
+const HOSTS = [
+  { id:'mom', file:'mom', name:'Mommy' },
+  { id:'dad', file:'dad', name:'Daddy' },
+  { id:'kid', file:'cay', name:KID_NAME }
+];
+const THINGS = [ // level 1..10
+  ['⭐','star','stars'], ['🍎','apple','apples'], ['🎈','balloon','balloons'],
+  ['🦆','duck','ducks'], ['🍪','cookie','cookies'], ['🌸','flower','flowers'],
+  ['🚗','car','cars'], ['🐶','puppy','puppies'], ['🧁','cupcake','cupcakes'], ['🦋','butterfly','butterflies']
+];
+const COLORS = ['#FF6FA3','#19B5A5','#3D8BFF','#FFC93C','#3CCB6B','#9B6BFF','#FF8A3D','#FF6FA3','#19B5A5','#3D8BFF'];
+const NOTES  = [262,294,330,349,392,440,494,523,587,659];
+const NUMBER_WORDS = ['One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten'];
+// Spoken by the browser's built-in voice only when the matching MP3 is missing or broken.
+const LINES = {
+  welcome:`Hi ${KID_NAME}! Let's count!`,
+  yay_1:`Great job, ${KID_NAME}!`, yay_2:'You did it!', yay_3:'Amazing counting!', yay_4:'Way to go!',
+  finale:"You counted all the way to ten! I'm so proud of you!"
+};
+const MUSIC_BASE = 0.15, MUSIC_DUCKED = 0.06; // music volume, normal and while a voice is talking
+const MUSIC_LOOP_SECONDS = 16;                // length of the music phrase; null = loop the whole file
+
+/* =====================================================================
+   Character art
+   PNG sprites when they load, the original SVG drawings when they don't.
+   ===================================================================== */
+const IMG_OK = {}; // 'mom_idle' -> true once that PNG has loaded
+
+function preloadImages(){
+  const keys = HOSTS.flatMap(h => [h.file + '_idle', h.file + '_cheer']);
+  const all = Promise.all(keys.map(k => new Promise(done => {
+    const im = new Image();
+    im.onload  = () => { IMG_OK[k] = true; done(); };
+    im.onerror = () => done();            // a failed image just means SVG for that character
+    im.src = `assets/img/${k}.png`;
+  })));
+  // Never trap the game on a loading state: give up waiting after 8 seconds.
+  return Promise.race([all, new Promise(r => setTimeout(r, 8000))]);
+}
+
+function ring(cx, cy, R, r, a0, a1, step, fill){
+  let s = '';
+  for (let a = a0; a <= a1; a += step){
+    const t = a * Math.PI / 180;
+    s += `<circle cx="${(cx + R*Math.cos(t)).toFixed(1)}" cy="${(cy + R*Math.sin(t)).toFixed(1)}" r="${r}" fill="${fill}"/>`;
+  }
+  return s;
+}
+function eyes(y, r){
+  return [84,116].map(x =>
+    `<circle cx="${x}" cy="${y}" r="${r}" fill="#2B1B12"/><circle cx="${x+r*0.35}" cy="${y-r*0.35}" r="${r*0.35}" fill="#fff"/>`).join('');
+}
+const body = c => `<path d="M26 220 Q28 166 100 160 Q172 166 174 220Z" fill="${c}"/>`;
+const ART = { // SVG fallbacks, unchanged from the prototype
+  mom(){
+    const skin='#F3CBA5', hair='#8A5A2B', hi='#D9A860';
+    return `<svg viewBox="0 0 200 220" aria-hidden="true">
+      ${body('#FF6FA3')}
+      <path d="M50 96 Q46 28 100 26 Q154 28 150 96 L160 198 Q142 212 128 196 L128 122 L72 122 L72 196 Q58 212 40 198Z" fill="${hair}"/>
+      <path d="M58 120 Q54 160 52 196 M146 120 Q150 160 150 196" stroke="${hi}" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <rect x="88" y="132" width="24" height="34" rx="10" fill="${skin}"/>
+      <ellipse cx="100" cy="98" rx="40" ry="46" fill="${skin}"/>
+      <path d="M58 96 Q52 38 100 36 Q148 38 142 96 Q138 62 106 54 Q84 74 58 96Z" fill="${hair}"/>
+      <path d="M72 62 Q88 46 108 46" stroke="${hi}" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M76 86 Q84 81 92 86 M108 86 Q116 81 124 86" stroke="#6B4423" stroke-width="3" fill="none" stroke-linecap="round"/>
+      ${eyes(98,5.5)}
+      <path d="M76 95 l-5 -4 M124 95 l5 -4" stroke="#2B1B12" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="74" cy="112" r="7" fill="#F59BA8" opacity=".6"/><circle cx="126" cy="112" r="7" fill="#F59BA8" opacity=".6"/>
+      <path d="M86 118 Q100 131 114 118" stroke="#C04A63" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    </svg>`;
+  },
+  dad(){
+    const skin='#A9683C', dark='#1C1512';
+    return `<svg viewBox="0 0 200 220" aria-hidden="true">
+      ${body('#3D8BFF')}
+      <rect x="84" y="134" width="32" height="34" rx="10" fill="${skin}"/>
+      <circle cx="55" cy="100" r="9" fill="${skin}"/><circle cx="145" cy="100" r="9" fill="${skin}"/>
+      <ellipse cx="100" cy="98" rx="44" ry="48" fill="${skin}"/>
+      <path d="M56 98 Q54 152 100 154 Q146 152 144 98 Q138 118 124 113 Q100 104 76 113 Q62 118 56 98Z" fill="${dark}"/>
+      <path d="M80 119 Q100 142 120 119Z" fill="#fff"/>
+      <path d="M58 86 Q60 46 100 46 Q140 46 142 86 Q120 66 100 66 Q80 66 58 86Z" fill="${dark}"/>
+      ${ring(100,88,46,11,-172,-8,18,dark)}
+      ${ring(100,84,30,11,-160,-20,28,dark)}
+      <path d="M74 84 Q84 78 93 84 M107 84 Q116 78 126 84" stroke="${dark}" stroke-width="4" fill="none" stroke-linecap="round"/>
+      ${eyes(95,5.5)}
+      <path d="M94 106 Q100 111 106 106" stroke="#7A4526" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    </svg>`;
+  },
+  kid(){
+    const skin='#DDA273', hair='#5A3320';
+    return `<svg viewBox="0 0 200 220" aria-hidden="true">
+      ${body('#FFC93C')}
+      ${ring(100,102,52,16,-215,35,19,hair)}
+      ${ring(100,96,36,16,-180,0,30,hair)}
+      <rect x="88" y="138" width="24" height="30" rx="10" fill="${skin}"/>
+      <ellipse cx="100" cy="108" rx="40" ry="39" fill="${skin}"/>
+      ${ring(100,104,40,9,-150,-30,24,hair)}
+      <path d="M100 44 l-20 -12 v24Z M100 44 l20 -12 v24Z" fill="#FF6FA3"/><circle cx="100" cy="44" r="6" fill="#E84C88"/>
+      ${eyes(108,7)}
+      <circle cx="72" cy="122" r="8" fill="#F59BA8" opacity=".65"/><circle cx="128" cy="122" r="8" fill="#F59BA8" opacity=".65"/>
+      <path d="M90 126 Q100 135 110 126" stroke="#B5485A" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </svg>`;
+  }
+};
+// pose: 'idle' or 'cheer'. A character uses PNGs only if its idle PNG loaded;
+// a missing cheer PNG falls back to the idle PNG (the jump animation still plays).
+function charHTML(h, pose){
+  let art;
+  if (IMG_OK[h.file + '_idle']){
+    const file = (pose === 'cheer' && IMG_OK[h.file + '_cheer']) ? h.file + '_cheer' : h.file + '_idle';
+    art = `<div class="sprite"><img src="assets/img/${file}.png" alt="" draggable="false"></div>`;
+  } else {
+    art = ART[h.id]();
+  }
+  return art + `<div class="name">${h.name}</div>`;
+}
+function fillFamily(el, anim, pose){
+  el.innerHTML = HOSTS.map(h =>
+    `<div class="char ${anim} ${h.id === 'kid' ? 'kid' : ''}">${charHTML(h, pose)}</div>`).join('');
+}
+
+/* =====================================================================
+   Audio engine (Web Audio API)
+   Why Web Audio and not <audio>: toddlers tap fast, and <audio> elements
+   lag and overlap on iOS. Decoded buffers start instantly and can be cut off.
+
+   Three channels:  voice (one clip at a time, interruptible)
+                    fx    (the rising tap notes and fanfare)
+                    music (looping, ducked while a voice is talking)
+   ===================================================================== */
+const store = {
+  get(k, dflt){ try{ const v = localStorage.getItem(k); return v === null ? dflt : v === '1'; }catch(e){ return dflt; } },
+  set(k, v){ try{ localStorage.setItem(k, v ? '1' : '0'); }catch(e){} }
+};
+let voiceOn = store.get('ccp.voice', true);   // voice + sound effects
+let musicOn = store.get('ccp.music', true);
+
+let actx = null, voiceGain, fxGain, musicGain;
+try{
+  // Created up front (it starts suspended) so clips can decode before Play is tapped.
+  // iOS only lets it make sound after resume() is called inside a tap: see unlock().
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  voiceGain = actx.createGain(); voiceGain.gain.value = 1;          voiceGain.connect(actx.destination);
+  fxGain    = actx.createGain(); fxGain.gain.value = 0.22;          fxGain.connect(actx.destination);
+  musicGain = actx.createGain(); musicGain.gain.value = MUSIC_BASE; musicGain.connect(actx.destination);
+}catch(e){ actx = null; }
+
+const CLIPS = ['welcome','finale','music'];
+for (let i = 1; i <= 10; i++) CLIPS.push('num_' + i, 'tap_' + i);
+for (let i = 1; i <= 4; i++) CLIPS.push('yay_' + i);
+
+const buf = {};      // key -> decoded AudioBuffer (only for clips that loaded)
+const loading = {};  // key -> promise that always resolves, loaded or not
+CLIPS.forEach(k => {
+  loading[k] = !actx ? Promise.resolve() :
+    fetch(`assets/audio/${k}.mp3`)
+      .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+      .then(ab => new Promise(done => actx.decodeAudioData(ab, b => { buf[k] = b; done(); }, () => done())))
+      .catch(() => {})   // missing or broken file: leave buf[k] empty, speech fallback takes over
+      .then(() => { if (k === 'music') syncMusic(); });
+});
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let ctxReady = Promise.resolve();
+// Must be called from inside a tap handler.
+function unlock(){
+  if (!actx || actx.state === 'running') return;
+  try{ ctxReady = Promise.race([actx.resume(), sleep(800)]).catch(() => {}); }catch(e){}
+}
+
+/* ----- fx ----- */
+function tone(freq, dur = 0.18){
+  if (!voiceOn || !actx || actx.state !== 'running') return;
+  try{
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'triangle'; o.frequency.value = freq;
+    g.gain.setValueAtTime(1, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+    o.connect(g); g.connect(fxGain);
+    o.start(); o.stop(actx.currentTime + dur);
+  }catch(e){}
+}
+function fanfare(){ [523,659,784,1047].forEach((f,i) => setTimeout(() => tone(f, .25), i*130)); }
+
+/* ----- voice -----
+   speak(key, text) plays assets/audio/<key>.mp3, or says `text` with the
+   browser voice if that clip is unavailable. Only one voice plays at a time:
+   calling speak() again cuts off whatever was talking (nothing is queued).
+   Returns a promise: true = finished on its own, false = was cut off.   */
+let current = null;
+function halt(){ if (current) current.stop(); }
+function speak(key, text){
+  halt();
+  if (!voiceOn) return Promise.resolve(true);
+  return new Promise(resolve => {
+    let src = null, usedSpeech = false, watchdog = null;
+    const me = { done:false, stop(){ finish(false); } };
+    function finish(ok){
+      if (me.done) return;
+      me.done = true;
+      clearTimeout(watchdog);
+      if (src){ src.onended = null; try{ src.stop(); }catch(e){} }
+      if (usedSpeech) try{ speechSynthesis.cancel(); }catch(e){}
+      if (current === me){ current = null; duck(false); }
+      resolve(ok);
+    }
+    current = me;
+    duck(true);
+    // Wait (briefly) for this clip to finish loading and for the audio unlock.
+    Promise.all([Promise.race([loading[key], sleep(1500)]), ctxReady]).then(() => {
+      if (me.done) return;                       // cut off while waiting
+      if (buf[key] && actx && actx.state === 'running'){
+        src = actx.createBufferSource();
+        src.buffer = buf[key];
+        src.connect(voiceGain);
+        src.onended = () => finish(true);
+        src.start();
+        // Safety net: never wait forever on an "ended" event that does not come.
+        watchdog = setTimeout(() => finish(true), buf[key].duration * 1000 + 600);
+      } else {
+        // Fallback: browser speech for this one event.
+        const synth = window.speechSynthesis;
+        if (!synth || !window.SpeechSynthesisUtterance){ watchdog = setTimeout(() => finish(true), 350); return; }
+        try{
+          usedSpeech = true;
+          synth.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.rate = 0.9; u.pitch = 1.2; u.lang = 'en-US';
+          u.onend = u.onerror = () => finish(true);
+          synth.speak(u);
+          watchdog = setTimeout(() => finish(true), 900 + text.length * 90);
+        }catch(e){ finish(true); }
+      }
+    });
+  });
+}
+
+/* ----- music ----- */
+let musicSrc = null, musicWanted = false;
+function duck(down){
+  if (!musicGain) return;
+  try{
+    const g = musicGain.gain, t = actx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(down ? MUSIC_DUCKED : MUSIC_BASE, t + (down ? 0.08 : 0.3)); // 300ms recovery
+  }catch(e){}
+}
+// Starts or stops the loop so it matches: on a play screen + music toggle on + file loaded.
+function syncMusic(){
+  const should = musicWanted && musicOn && actx && buf.music;
+  if (should && !musicSrc){
+    try{
+      const b = buf.music, s = actx.createBufferSource();
+      s.buffer = b; s.loop = true;
+      // MP3 encoders pad the file with a little silence, which would click or gap on
+      // every repeat. If the decoded file is longer than the phrase, loop only the phrase.
+      const extra = MUSIC_LOOP_SECONDS ? b.duration - MUSIC_LOOP_SECONDS : 0;
+      if (extra > 0.002){
+        s.loopStart = Math.min(extra, 1105 / b.sampleRate); // typical MP3 lead-in
+        s.loopEnd = s.loopStart + MUSIC_LOOP_SECONDS;
+      }
+      s.connect(musicGain);
+      s.start(0, s.loopStart || 0);
+      musicSrc = s;
+    }catch(e){ musicSrc = null; }
+  } else if (!should && musicSrc){
+    try{ musicSrc.stop(); }catch(e){}
+    musicSrc = null;
+  }
+}
+
+/* =====================================================================
+   Game
+   runId guards every delayed step: Home, Again or a new level bumps it,
+   and any older timer or audio callback sees the mismatch and does nothing.
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+let level = 1, count = 0, runId = 0, lastYay = 0, screen = 'home';
+
+function show(id){
+  screen = id;
+  document.body.dataset.screen = id;
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+}
+function drawDots(){
+  $('dots').innerHTML = Array.from({length:10}, (_, i) => {
+    const n = i + 1;
+    return `<div class="dot ${n < level ? 'done' : n === level ? 'now' : ''}">${n}</div>`;
+  }).join('');
+}
+function setHost(host, anim, pose){
+  $('host').className = `char ${anim} ${host.id === 'kid' ? 'kid' : ''}`;
+  $('host').innerHTML = charHTML(host, pose);
+}
+function newGame(){
+  unlock();
+  musicWanted = true; syncMusic();
+  show('game');
+  startLevel(1, true);
+}
+async function startLevel(n, fresh){
+  const id = ++runId;
+  level = n; count = 0;
+  const host = HOSTS[(n - 1) % HOSTS.length];
+  const [emoji, one, many] = THINGS[n - 1];
+  const word = n === 1 ? one : many;
+
+  drawDots();
+  setHost(host, 'bob', 'idle');
+  $('bubble').textContent = `Tap the ${word}!`;
+  $('bigNum').textContent = '';
+  $('bigNum').style.color = COLORS[n - 1];
+
+  const box = $('items');
+  box.className = n <= 4 ? 'few' : '';
+  box.innerHTML = '';
+  for (let i = 0; i < n; i++){
+    const b = document.createElement('button');
+    b.className = 'item';
+    b.style.setProperty('--c', COLORS[i]);
+    b.style.animationDelay = (-Math.random() * 1.8) + 's';
+    b.innerHTML = `${emoji}<span class="badge"></span>`;
+    b.addEventListener('pointerdown', () => tapItem(b), { once:true });
+    box.appendChild(b);
+  }
+  // New game: welcome, then the instruction. A tap on an item cuts either one off
+  // (speak() returns false), and then the instruction is skipped.
+  if (fresh){
+    const finished = await speak('welcome', LINES.welcome);
+    if (!finished || id !== runId) return;
+  }
+  speak('tap_' + n, `Tap the ${word}!`);
+}
+function tapItem(b){
+  if (b.classList.contains('done')) return;
+  unlock();
+  count++;
+  b.classList.add('done');
+  b.style.animationDelay = '0s';
+  b.querySelector('.badge').textContent = count;
+  const big = $('bigNum');
+  big.textContent = count;
+  big.classList.remove('pop'); void big.offsetWidth; big.classList.add('pop');
+  tone(NOTES[count - 1]);
+  const said = speak('num_' + count, NUMBER_WORDS[count - 1] + '!');
+  if (count === level){
+    // Let the last number finish before the praise (and wait at least a beat with sound off).
+    const id = runId;
+    Promise.all([said, sleep(600)]).then(() => { if (id === runId) levelDone(id); });
+  }
+}
+async function levelDone(id){
+  const host = HOSTS[(level - 1) % HOSTS.length];
+  setHost(host, 'jump', 'cheer');
+  $('bubble').textContent = `${level}! Yay!`;
+  fanfare(); confetti(30);
+  let pick; do { pick = 1 + Math.floor(Math.random() * 4); } while (pick === lastYay);
+  lastYay = pick;
+  speak('yay_' + pick, LINES['yay_' + pick]);
+  await sleep(3200);
+  if (id !== runId) return;
+  level < 10 ? startLevel(level + 1) : win();
+}
+function win(){
+  ++runId;
+  show('win');
+  fillFamily($('winFamily'), 'jump', 'cheer');
+  $('row10').innerHTML = '';
+  for (let n = 1; n <= 10; n++){
+    const b = document.createElement('button');
+    b.textContent = n; b.style.background = COLORS[n - 1];
+    b.addEventListener('pointerdown', () => { unlock(); tone(NOTES[n - 1]); speak('num_' + n, NUMBER_WORDS[n - 1] + '!'); });
+    $('row10').appendChild(b);
+  }
+  fanfare(); confetti(90);
+  speak('finale', LINES.finale);
+}
+function confetti(n){
+  for (let i = 0; i < n; i++){
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = COLORS[i % COLORS.length];
+    c.style.animationDuration = (1.6 + Math.random() * 1.8) + 's';
+    c.style.animationDelay = (Math.random() * 0.6) + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 4500);
+  }
+}
+function goHome(){
+  ++runId;               // cancels any pending level change
+  halt();
+  musicWanted = false; syncMusic();
+  show('home');
+}
+
+/* ----- controls ----- */
+function paintToggles(){
+  $('voiceBtn').classList.toggle('off', !voiceOn);
+  $('musicBtn').classList.toggle('off', !musicOn);
+}
+$('voiceBtn').addEventListener('click', () => {
+  voiceOn = !voiceOn; store.set('ccp.voice', voiceOn);
+  if (!voiceOn) halt();
+  paintToggles();
+});
+$('musicBtn').addEventListener('click', () => {
+  unlock();
+  musicOn = !musicOn; store.set('ccp.music', musicOn);
+  syncMusic(); paintToggles();
+});
+$('play').addEventListener('click', newGame);
+$('again').addEventListener('click', newGame);
+$('goHome').addEventListener('click', goHome);
+
+// Pause all sound when the page is hidden; pick back up when it returns.
+document.addEventListener('visibilitychange', () => {
+  if (!actx) return;
+  if (document.hidden){
+    try{ window.speechSynthesis && speechSynthesis.cancel(); }catch(e){}
+    actx.suspend().catch(() => {});
+  } else if (screen !== 'home'){
+    actx.resume().catch(() => {});
+  }
+});
+// iOS can leave the audio context "interrupted" after a call or app switch: any tap revives it.
+document.addEventListener('pointerdown', () => { if (screen !== 'home') unlock(); }, true);
+// Block pinch and double-tap zoom so little hands don't lose the screen.
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+
+/* ----- boot ----- */
+paintToggles();
+preloadImages().then(() => {
+  fillFamily($('homeFamily'), 'bob', 'idle');
+  $('play').disabled = false;
+});
+</script>
+</body>
+</html>
