@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Cay's Counting Party. © 2026 On The Verge LLC (OTV Agency). All rights reserved.
+     Characters, artwork, voice recordings, music and code may not be copied, reused or redistributed without written permission. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -10,6 +12,8 @@
 <meta name="apple-mobile-web-app-title" content="Counting Party">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#FFF3D6">
+<meta name="copyright" content="© 2026 On The Verge LLC (OTV Agency). All rights reserved.">
+<meta name="author" content="On The Verge LLC (OTV Agency)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-180.png">
@@ -70,6 +74,9 @@
   .big-btn:active{transform:translateY(6px);box-shadow:0 4px 0 #249C4C;animation:none}
   .big-btn[disabled]{background:#C9B7A3;box-shadow:0 10px 0 #A8957F;animation:none}
   @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+
+  .copyright{position:absolute;left:0;right:0;bottom:max(8px,env(safe-area-inset-bottom));text-align:center;
+    font-size:clamp(11px,1.7vmin,15px);line-height:1.35;font-weight:500;color:rgba(58,42,30,.65);pointer-events:none;padding:0 12px}
 
   /* ---------- shared top bar (game + finale) ---------- */
   #bar{position:fixed;z-index:5;display:none;align-items:center;gap:8px;
@@ -143,6 +150,8 @@
   <h1>Cay's<small>Counting Party</small></h1>
   <div class="family" id="homeFamily"></div>
   <button class="big-btn" id="play" disabled>▶ Play</button>
+  <!-- Plain text on purpose: a tappable link here would pull a toddler out of the game. -->
+  <div class="copyright"><b>Created by OTV Agency</b> · otv.agency<br>© 2026 On The Verge LLC. All rights reserved.</div>
 </section>
 
 <section id="game" class="screen">
