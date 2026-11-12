@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<!-- Cay's Counting Party. © 2026 On The Verge LLC (OTV Agency). All rights reserved.
+<!-- Cay's Counting Adventure. © 2026 On The Verge LLC (OTV Agency). All rights reserved.
      Characters, artwork, voice recordings, music and code may not be copied, reused or redistributed without written permission. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<!-- viewport-fit=cover is paired with the env(safe-area-inset-*) padding below -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Cay's Counting Party</title>
+<title>Cay's Counting Adventure</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Counting Party">
@@ -18,152 +17,207 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-180.png">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<!--
+  Cay's Counting Adventure — a redesign of Counting Party.
+  Instead of tapping items, Cay walks around a meadow and COLLECTS them.
+  Two ways to move her (both always work):
+    1. Drag / touch anywhere in the meadow: Cay walks to your finger.
+    2. Touch Pad mode: a pad under the meadow works like a laptop trackpad —
+       slide your finger on it and Cay moves the same way (hand never covers the play area).
+  Teaching loop per level: "Find 3 apples!" -> each pickup flies into a counting tray
+  with a spoken number -> when the tray is full, the game re-counts the tray 1..N
+  out loud (one-to-one correspondence), then says the total (cardinality).
+-->
 <style>
   :root{
     --bg1:#FFF3D6; --bg2:#FFD9A0; --ink:#3A2A1E;
     --pink:#FF6FA3; --teal:#19B5A5; --blue:#3D8BFF; --yellow:#FFC93C; --green:#3CCB6B; --purple:#9B6BFF;
-    --pad:clamp(10px,2.5vmin,24px);
-    --bar:64px; /* top-bar button size: 64px minimum tap target */
+    --grass1:#B8EB8F; --grass2:#8FD46A;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
-  html,body{margin:0;height:100%;overflow:hidden;touch-action:manipulation}
+  html,body{margin:0;height:100%;overflow:hidden;touch-action:none;overscroll-behavior:none}
   body{
     font-family:'Fredoka',system-ui,-apple-system,sans-serif;color:var(--ink);
     background:radial-gradient(circle at 15% 10%,#FFE9F1 0 18%,transparent 19%),
                radial-gradient(circle at 88% 85%,#D8F6F1 0 22%,transparent 23%),
                linear-gradient(160deg,var(--bg1),var(--bg2));
   }
+  img{-webkit-user-drag:none}
   .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
-    padding:max(var(--pad),env(safe-area-inset-top)) max(var(--pad),env(safe-area-inset-right))
-            max(var(--pad),env(safe-area-inset-bottom)) max(var(--pad),env(safe-area-inset-left))}
+    padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
   .screen.on{display:flex}
-  /* game and finale sit under the shared top bar */
-  #game,#win{padding-top:calc(max(var(--pad),env(safe-area-inset-top)) + var(--bar) + 6px)}
   button{font-family:inherit;color:inherit;border:0;cursor:pointer}
-  img{-webkit-user-drag:none;pointer-events:none}
 
-  /* ---------- characters ----------
-     Sprites are 1024x1024 with a lot of empty margin. .sprite is a window onto the
-     middle of the image (x 256-768, y 56-960), shared by idle and cheer so the
-     figure does not jump or resize when the pose swaps. Size is set by --h. */
-  .char{display:flex;flex-direction:column;align-items:center;width:calc(var(--h)*.566);flex:none}
-  .sprite{position:relative;width:100%;aspect-ratio:512/904;overflow:hidden}
-  .sprite img{position:absolute;width:200%;height:113.274%;left:-50%;top:-6.195%;max-width:none}
-  .char svg{width:100%;height:auto;display:block;filter:drop-shadow(0 6px 0 rgba(58,42,30,.15))}
-  .char .name{font-weight:700;font-size:clamp(14px,2.8vmin,26px);background:#fff;border-radius:999px;padding:2px 10px;
-    margin-top:2px;box-shadow:0 4px 0 rgba(58,42,30,.15);white-space:nowrap}
+  /* characters */
+  .char{display:flex;flex-direction:column;align-items:center}
+  .char svg,.char img{width:100%;height:auto;display:block;filter:drop-shadow(0 6px 0 rgba(58,42,30,.15))}
+  .char .name{font-weight:700;font-size:clamp(16px,2.8vmin,28px);background:#fff;border-radius:999px;padding:2px 14px;margin-top:-10px;position:relative;box-shadow:0 4px 0 rgba(58,42,30,.15)}
   .bob{animation:bob 2.4s ease-in-out infinite}
   .jump{animation:jump .5s ease-in-out infinite}
   @keyframes bob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(2deg)}}
   @keyframes jump{0%,100%{transform:translateY(0)}50%{transform:translateY(-22px) scale(1.04)}}
 
-  /* ---------- home ---------- */
-  #home{justify-content:center;gap:clamp(8px,2.4vmin,22px)}
-  h1{margin:0;text-align:center;font-size:clamp(32px,7.5vmin,80px);line-height:1;color:var(--pink);
+  /* home */
+  #home{justify-content:center;gap:clamp(8px,2.4vmin,24px)}
+  h1{margin:0;text-align:center;font-size:clamp(34px,8vmin,84px);line-height:1;color:var(--pink);
      text-shadow:0 5px 0 #fff,0 9px 0 rgba(58,42,30,.15)}
   h1 small{display:block;font-size:.5em;color:var(--teal)}
-  .family{display:flex;align-items:flex-end;justify-content:center;gap:clamp(14px,2.2vmin,24px);width:100%}
-  .family .char{--h:clamp(170px,40vmin,370px)}
-  .family .char.kid{--h:clamp(125px,29vmin,270px)}
-  #win .family .char{--h:clamp(140px,30vmin,280px)}
-  #win .family .char.kid{--h:clamp(104px,22vmin,205px)}
-  .family .char:nth-child(2){animation-delay:.17s}
-  .family .char:nth-child(3){animation-delay:.34s}
-  .big-btn{background:var(--green);color:#fff;font-weight:700;font-size:clamp(30px,6.5vmin,64px);min-height:64px;
-    padding:.25em 1.2em;border-radius:999px;box-shadow:0 10px 0 #249C4C;animation:pulse 1.4s ease-in-out infinite;flex:none}
+  .family{display:flex;align-items:flex-end;justify-content:center;gap:clamp(4px,2vmin,24px);width:100%}
+  .family .char{width:clamp(110px,27vmin,250px)}
+  .family .char.kid{width:clamp(90px,21vmin,195px)}
+  .family .char:nth-child(2){animation-delay:.4s}
+  .family .char:nth-child(3){animation-delay:.8s}
+  .big-btn{background:var(--green);color:#fff;font-weight:700;font-size:clamp(30px,6.5vmin,64px);
+    padding:.25em 1.2em;border-radius:999px;box-shadow:0 10px 0 #249C4C;animation:pulse 1.4s ease-in-out infinite}
   .big-btn:active{transform:translateY(6px);box-shadow:0 4px 0 #249C4C;animation:none}
-  .big-btn[disabled]{background:#C9B7A3;box-shadow:0 10px 0 #A8957F;animation:none}
   @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+  .credit{position:absolute;left:0;right:0;bottom:max(10px,env(safe-area-inset-bottom));text-align:center;
+    font-weight:500;font-size:clamp(11px,1.7vmin,15px);line-height:1.35;color:rgba(58,42,30,.65);pointer-events:none;padding:0 12px}
+  .modes{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .mode-btn{min-height:64px;padding:8px 20px;border-radius:22px;background:#fff;font-weight:700;font-size:clamp(18px,3vmin,26px);
+    box-shadow:0 5px 0 rgba(58,42,30,.18);display:flex;align-items:center;gap:10px;opacity:.65}
+  .mode-btn.sel{opacity:1;outline:5px solid var(--teal)}
+  .mode-btn .ico{font-size:1.4em}
 
-  .copyright{position:absolute;left:0;right:0;bottom:max(8px,env(safe-area-inset-bottom));text-align:center;
-    font-size:clamp(11px,1.7vmin,15px);line-height:1.35;font-weight:500;color:rgba(58,42,30,.65);pointer-events:none;padding:0 12px}
-
-  /* ---------- shared top bar (game + finale) ---------- */
-  #bar{position:fixed;z-index:5;display:none;align-items:center;gap:8px;
-    top:max(var(--pad),env(safe-area-inset-top));
-    left:max(var(--pad),env(safe-area-inset-left));right:max(var(--pad),env(safe-area-inset-right))}
-  body[data-screen="game"] #bar,body[data-screen="win"] #bar{display:flex}
-  body[data-screen="win"] .dots{visibility:hidden}
-  .icon-btn{position:relative;width:var(--bar);height:var(--bar);border-radius:50%;background:#fff;font-size:30px;
-    box-shadow:0 4px 0 rgba(58,42,30,.18);flex:none;display:grid;place-items:center}
-  .icon-btn:active{transform:translateY(3px)}
-  .icon-btn.off{background:#EADFD2}
-  .icon-btn.off::after{content:"";position:absolute;left:14%;right:14%;top:50%;height:6px;margin-top:-3px;
-    background:#E5484D;border-radius:3px;transform:rotate(-45deg);box-shadow:0 0 0 2px #fff}
-  /* dots shrink to share whatever width is left between the buttons */
-  .dots{flex:1;min-width:0;display:flex;justify-content:center;gap:clamp(2px,1vmin,10px);container-type:inline-size}
-  .dot{flex:1 1 0;min-width:0;max-width:44px;aspect-ratio:1;border-radius:50%;background:#fff;
-    display:grid;place-items:center;font-weight:700;font-size:min(22px,5cqw);color:#C9B7A3;box-shadow:0 3px 0 rgba(58,42,30,.12)}
+  /* game */
+  #game{gap:clamp(6px,1.2vmin,12px)}
+  .top{display:flex;align-items:center;gap:10px;width:100%;max-width:1100px}
+  .icon-btn{width:64px;height:64px;border-radius:50%;background:#fff;font-size:30px;box-shadow:0 4px 0 rgba(58,42,30,.18);flex:none}
+  .icon-btn.off{opacity:.45}
+  .dots{flex:1;display:flex;justify-content:center;gap:clamp(3px,.9vmin,10px)}
+  .dot{width:clamp(20px,4.4vmin,42px);height:clamp(20px,4.4vmin,42px);border-radius:50%;background:#fff;flex:none;
+    display:grid;place-items:center;font-weight:700;font-size:clamp(11px,2.3vmin,20px);color:#C9B7A3;box-shadow:0 3px 0 rgba(58,42,30,.12)}
   .dot.done{background:var(--green);color:#fff}
-  .dot.now{background:var(--yellow);color:var(--ink);transform:scale(1.15)}
+  .dot.now{background:var(--yellow);color:var(--ink);transform:scale(1.18)}
+  @media (max-width:640px){ .top{flex-wrap:wrap} .dots{order:9;flex-basis:100%} }
 
-  /* ---------- game ---------- */
-  .hostrow{display:flex;align-items:center;justify-content:center;gap:clamp(6px,2.5vmin,28px);width:100%;max-width:980px;flex:none}
-  #host{--h:clamp(130px,32vmin,290px)}
-  #host.kid{--h:clamp(108px,26vmin,236px)}
-  .bubble{position:relative;background:#fff;border-radius:28px;padding:.35em .8em;font-weight:700;
-    font-size:clamp(20px,4.6vmin,46px);box-shadow:0 6px 0 rgba(58,42,30,.15);text-align:center}
-  .bubble::before{content:"";position:absolute;left:-14px;top:50%;margin-top:-12px;border:12px solid transparent;border-right-color:#fff;border-left:0}
+  .hud{display:flex;align-items:center;gap:clamp(8px,2vmin,22px);width:100%;max-width:1100px}
+  #host{width:clamp(70px,15vmin,140px);flex:none;margin:-8px 0 -10px}
+  .mid{flex:1;display:flex;flex-direction:column;gap:clamp(4px,1vmin,10px);align-items:flex-start;min-width:0}
+  .bubble{position:relative;background:#fff;border-radius:24px;padding:.2em .8em;font-weight:700;
+    font-size:clamp(18px,3.6vmin,38px);box-shadow:0 5px 0 rgba(58,42,30,.15)}
+  .bubble::before{content:"";position:absolute;left:-12px;top:50%;margin-top:-10px;border:10px solid transparent;border-right-color:#fff;border-left:0}
+  .tray{display:flex;flex-wrap:wrap;gap:clamp(4px,.9vmin,8px);background:rgba(255,255,255,.55);padding:6px;border-radius:20px;border:3px dashed #E7C79C}
+  .slot{--z:clamp(34px,6.4vmin,60px);width:var(--z);height:var(--z);border-radius:30%;background:#fff;display:grid;place-items:center;
+    font-size:calc(var(--z)*.62);position:relative;box-shadow:0 3px 0 rgba(58,42,30,.12);transition:transform .2s}
+  .slot .ghost{opacity:.22;filter:grayscale(1)}
+  .slot.filled{background:var(--c)}
+  .slot.filled .ghost{opacity:1;filter:none}
+  .slot .n{position:absolute;right:-6px;top:-6px;width:46%;height:46%;border-radius:50%;background:var(--ink);color:#fff;
+    font-weight:700;font-size:calc(var(--z)*.26);display:none;place-items:center;border:2px solid #fff}
+  .slot.filled .n{display:grid}
+  .slot.say{transform:scale(1.35) translateY(-4px);z-index:2}
   #bigNum{flex:none;min-width:1.2em;text-align:center;font-weight:700;line-height:1;
-    font-size:clamp(64px,20vmin,200px);color:var(--blue);text-shadow:0 6px 0 #fff,0 11px 0 rgba(58,42,30,.15)}
+    font-size:clamp(60px,15vmin,160px);color:var(--blue);text-shadow:0 6px 0 #fff,0 11px 0 rgba(58,42,30,.15)}
   #bigNum.pop{animation:pop .35s ease-out}
   @keyframes pop{0%{transform:scale(.4)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
 
-  #items{flex:1;min-height:0;width:100%;max-width:860px;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;
-    gap:clamp(8px,2.2vmin,22px);padding:6px 0}
-  #items:not(.few){max-width:calc(5*clamp(64px,14vmin,128px) + 5*clamp(8px,2.2vmin,22px))}
-  .item{--s:clamp(64px,14vmin,128px);position:relative;width:var(--s);height:var(--s);border-radius:28%;
-    background:#fff;box-shadow:0 7px 0 rgba(58,42,30,.18);font-size:calc(var(--s)*.62);line-height:1;
-    display:grid;place-items:center;animation:wiggle 1.8s ease-in-out infinite}
-  .few .item{--s:clamp(96px,22vmin,190px)}
-  .item:active{transform:scale(.92)}
-  .item.done{animation:tapped .4s ease-out;background:var(--c);box-shadow:0 7px 0 rgba(58,42,30,.25);pointer-events:none}
-  .item .badge{position:absolute;right:-8px;top:-8px;width:42%;height:42%;border-radius:50%;background:var(--ink);color:#fff;
-    font-family:inherit;font-weight:700;font-size:calc(var(--s)*.26);display:none;place-items:center;border:3px solid #fff}
-  .item.done .badge{display:grid}
-  @keyframes wiggle{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
-  @keyframes tapped{0%{transform:scale(1)}40%{transform:scale(1.3) rotate(10deg)}100%{transform:scale(1)}}
+  /* the meadow where Cay walks around */
+  #field{position:relative;flex:1;width:100%;max-width:1100px;min-height:180px;border-radius:32px;overflow:hidden;touch-action:none;
+    border:5px solid #fff;box-shadow:0 8px 0 rgba(58,42,30,.15);
+    background:
+      radial-gradient(circle at 20% 30%,rgba(255,255,255,.35) 0 6%,transparent 7%),
+      radial-gradient(circle at 75% 70%,rgba(255,255,255,.3) 0 8%,transparent 9%),
+      radial-gradient(circle at 60% 15%,rgba(255,255,255,.25) 0 5%,transparent 6%),
+      repeating-radial-gradient(circle at 50% 120%,var(--grass1) 0 40px,#AEE585 40px 80px)}
+  .thing{position:absolute;left:0;top:0;display:grid;place-items:center;line-height:1;pointer-events:none}
+  .thing .in{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.85) 0 55%,rgba(255,255,255,0) 70%);animation:wiggle 1.8s ease-in-out infinite}
+  .thing.hint .in{animation:hint .7s ease-in-out infinite;background:radial-gradient(circle,#FFF7C2 0 55%,rgba(255,201,60,.0) 72%)}
+  .thing.gone{animation:gone .35s ease-in forwards}
+  @keyframes wiggle{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+  @keyframes hint{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+  @keyframes gone{to{transform:var(--t) scale(0);opacity:0}}
 
-  /* ---------- finale ---------- */
-  #win{justify-content:center;gap:clamp(6px,2vmin,18px)}
-  .row10{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(5px,1.2vmin,12px);max-width:900px;flex:none}
-  .row10 button{width:clamp(64px,8.4vmin,80px);height:clamp(64px,8.4vmin,80px);border-radius:24%;color:#fff;font-weight:700;
-    font-size:clamp(28px,4.6vmin,44px);box-shadow:0 6px 0 rgba(58,42,30,.22)}
+  #cay{position:absolute;left:0;top:0;pointer-events:none;z-index:3}
+  #cay .face{width:100%;transition:transform .15s}
+  #cay .face img,#cay .face svg{width:100%;height:auto;display:block;filter:drop-shadow(0 5px 0 rgba(58,42,30,.18))}
+  #cay .body{width:100%}
+  #cay.walking .body{animation:walk .32s ease-in-out infinite}
+  @keyframes walk{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-8%) rotate(3deg)}}
+  #cay .shadow{position:absolute;left:22%;right:22%;bottom:2%;height:9%;border-radius:50%;background:rgba(40,80,20,.25);z-index:-1}
+
+  #target{position:absolute;left:0;top:0;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;border:5px solid rgba(255,255,255,.9);
+    pointer-events:none;opacity:0;transition:opacity .2s;z-index:2}
+  #target.on{opacity:1;animation:ping 1s ease-out infinite}
+  @keyframes ping{0%{transform:scale(.6)}100%{transform:scale(1.2)}}
+
+  #arrow{position:absolute;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;pointer-events:none;z-index:4;display:none}
+  #arrow.on{display:block}
+  #arrow svg{width:100%;height:100%;animation:nudge .6s ease-in-out infinite}
+  @keyframes nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(10px)}}
+
+  .burst{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;pointer-events:none;z-index:5;
+    border:6px solid var(--yellow);animation:burst .5s ease-out forwards}
+  @keyframes burst{from{transform:scale(.3);opacity:1}to{transform:scale(5);opacity:0}}
+
+  .flyer{position:fixed;left:0;top:0;z-index:8;pointer-events:none;display:grid;place-items:center;line-height:1;
+    transition:transform .55s cubic-bezier(.5,-0.3,.6,1)}
+
+  /* touch pad: works like a laptop trackpad */
+  #pad{display:none;position:relative;width:100%;max-width:620px;height:clamp(130px,24vh,240px);flex:none;border-radius:32px;touch-action:none;
+    background:radial-gradient(circle,#D9CBB8 2px,transparent 3px) 0 0/28px 28px,#FFFDF7;
+    border:5px solid #fff;box-shadow:inset 0 0 0 3px #E7C79C,0 8px 0 rgba(58,42,30,.15)}
+  body.padmode #pad{display:block}
+  #pad .label{position:absolute;inset:0;display:grid;place-items:center;font-weight:700;font-size:clamp(18px,3vmin,28px);color:#B79C7C;pointer-events:none;transition:opacity .3s}
+  #pad.active .label{opacity:0}
+  #padDot{position:absolute;left:0;top:0;width:70px;height:70px;margin:-35px 0 0 -35px;border-radius:50%;background:rgba(25,181,165,.35);
+    border:4px solid var(--teal);pointer-events:none;display:none}
+  #pad.active #padDot{display:block}
+
+  /* finale */
+  #win{justify-content:center;gap:clamp(8px,2.2vmin,22px)}
+  #win .corner{position:absolute;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));display:flex;gap:10px}
+  .row10{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(6px,1.4vmin,12px);max-width:900px}
+  .row10 button{width:clamp(64px,8.4vmin,84px);height:clamp(64px,8.4vmin,84px);border-radius:24%;color:#fff;font-weight:700;
+    font-size:clamp(26px,4.6vmin,44px);box-shadow:0 6px 0 rgba(58,42,30,.22)}
   .row10 button:active{transform:translateY(4px)}
 
   .confetti{position:fixed;top:-20px;width:14px;height:20px;border-radius:4px;pointer-events:none;z-index:9;animation:fall linear forwards}
   @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
 
-  @media (prefers-reduced-motion:reduce){.bob,.item,.big-btn{animation:none}}
+  @media (prefers-reduced-motion:reduce){.bob,.thing .in,.big-btn,#cay.walking .body,#target.on{animation:none}}
 </style>
 </head>
-<body data-screen="home">
-
-<header id="bar">
-  <button class="icon-btn" id="goHome" aria-label="Home">🏠</button>
-  <div class="dots" id="dots"></div>
-  <button class="icon-btn" id="musicBtn" aria-label="Music">🎵</button>
-  <button class="icon-btn" id="voiceBtn" aria-label="Voice and sound effects">🔊</button>
-</header>
+<body>
 
 <section id="home" class="screen on">
-  <h1>Cay's<small>Counting Party</small></h1>
+  <h1>Cay's<small>Counting Adventure</small></h1>
   <div class="family" id="homeFamily"></div>
-  <button class="big-btn" id="play" disabled>▶ Play</button>
-  <!-- Plain text on purpose: a tappable link here would pull a toddler out of the game. -->
-  <div class="copyright"><b>Created by OTV Agency</b> · otv.agency<br>© 2026 On The Verge LLC. All rights reserved.</div>
+  <div class="modes">
+    <button class="mode-btn" data-mode="drag"><span class="ico">👆</span>Drag</button>
+    <button class="mode-btn" data-mode="pad"><span class="ico">🖐️</span>Touch Pad</button>
+  </div>
+  <button class="big-btn" id="play">▶ Play</button>
+  <footer class="credit"><b>Created by OTV Agency</b> · otv.agency<br>© 2026 On The Verge LLC. All rights reserved.</footer>
 </section>
 
 <section id="game" class="screen">
-  <div class="hostrow">
+  <div class="top">
+    <button class="icon-btn" id="goHome" aria-label="Home">🏠</button>
+    <div class="dots" id="dots"></div>
+    <button class="icon-btn" id="modeBtn" aria-label="Switch drag or touch pad">🖐️</button>
+    <button class="icon-btn" id="musicBtn" aria-label="Music">🎵</button>
+    <button class="icon-btn" id="soundBtn" aria-label="Sound">🔊</button>
+  </div>
+  <div class="hud">
     <div id="host" class="char bob"></div>
-    <div class="bubble" id="bubble"></div>
+    <div class="mid">
+      <div class="bubble" id="bubble"></div>
+      <div class="tray" id="tray"></div>
+    </div>
     <div id="bigNum"></div>
   </div>
-  <div id="items"></div>
+  <div id="field">
+    <div id="target"></div>
+    <div id="arrow"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 24h28V10l22 22-22 22V40H8z" fill="#FF6FA3" stroke="#fff" stroke-width="5" stroke-linejoin="round"/></svg></div>
+    <div id="cay"><div class="shadow"></div><div class="body"><div class="face" id="cayArt"></div></div></div>
+  </div>
+  <div id="pad"><div class="label">🖐️ Slide your finger here</div><div id="padDot"></div></div>
 </section>
 
 <section id="win" class="screen">
+  <div class="corner"><button class="icon-btn" id="winHome" aria-label="Home">🏠</button></div>
   <h1>You counted<small>to 10!</small></h1>
   <div class="family" id="winFamily"></div>
   <div class="row10" id="row10"></div>
@@ -171,16 +225,12 @@
 </section>
 
 <script>
-/* =====================================================================
-   EDIT ME: names, what gets counted, and the fallback lines.
-   ===================================================================== */
+/* ---------- EDIT ME: names, what gets counted, and how it feels ---------- */
 const KID_NAME = 'Cay';
-// `id` picks the SVG fallback drawing; `file` is the PNG prefix in assets/img.
-// The prototype id "kid" maps to the "cay_*" files on purpose.
-const HOSTS = [
-  { id:'mom', file:'mom', name:'Mommy' },
-  { id:'dad', file:'dad', name:'Daddy' },
-  { id:'kid', file:'cay', name:KID_NAME }
+const HOSTS = [ // `file` = asset prefix in assets/img (kid -> cay), `id` = SVG fallback key
+  { id:'mom', name:'Mommy', file:'mom' },
+  { id:'dad', name:'Daddy', file:'dad' },
+  { id:'kid', name:KID_NAME, file:'cay' }
 ];
 const THINGS = [ // level 1..10
   ['⭐','star','stars'], ['🍎','apple','apples'], ['🎈','balloon','balloons'],
@@ -189,34 +239,12 @@ const THINGS = [ // level 1..10
 ];
 const COLORS = ['#FF6FA3','#19B5A5','#3D8BFF','#FFC93C','#3CCB6B','#9B6BFF','#FF8A3D','#FF6FA3','#19B5A5','#3D8BFF'];
 const NOTES  = [262,294,330,349,392,440,494,523,587,659];
-const NUMBER_WORDS = ['One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten'];
-// Spoken by the browser's built-in voice only when the matching MP3 is missing or broken.
-const LINES = {
-  welcome:`Hi ${KID_NAME}! Let's count!`,
-  yay_1:`Great job, ${KID_NAME}!`, yay_2:'You did it!', yay_3:'Amazing counting!', yay_4:'Way to go!',
-  finale:"You counted all the way to ten! I'm so proud of you!"
-};
-const MUSIC_BASE = 0.15, MUSIC_DUCKED = 0.06; // music volume, normal and while a voice is talking
-const MUSIC_LOOP_SECONDS = 16;                // length of the music phrase; null = loop the whole file
+const WALK_SPEED = 1.1;   // how fast Cay walks to your finger (meadow-heights per second)
+const PAD_GAIN   = 2.4;   // touch pad sensitivity: 1cm on the pad moves Cay 2.4cm
+const HINT_AFTER = 6000;  // ms without a pickup before an arrow points at the nearest item
+const MUSIC_VOL = 0.15, MUSIC_DUCK = 0.05;
 
-/* =====================================================================
-   Character art
-   PNG sprites when they load, the original SVG drawings when they don't.
-   ===================================================================== */
-const IMG_OK = {}; // 'mom_idle' -> true once that PNG has loaded
-
-function preloadImages(){
-  const keys = HOSTS.flatMap(h => [h.file + '_idle', h.file + '_cheer']);
-  const all = Promise.all(keys.map(k => new Promise(done => {
-    const im = new Image();
-    im.onload  = () => { IMG_OK[k] = true; done(); };
-    im.onerror = () => done();            // a failed image just means SVG for that character
-    im.src = `assets/img/${k}.png`;
-  })));
-  // Never trap the game on a loading state: give up waiting after 8 seconds.
-  return Promise.race([all, new Promise(r => setTimeout(r, 8000))]);
-}
-
+/* ---------- Character art: PNG sprites with the original SVG as fallback ---------- */
 function ring(cx, cy, R, r, a0, a1, step, fill){
   let s = '';
   for (let a = a0; a <= a1; a += step){
@@ -230,332 +258,347 @@ function eyes(y, r){
     `<circle cx="${x}" cy="${y}" r="${r}" fill="#2B1B12"/><circle cx="${x+r*0.35}" cy="${y-r*0.35}" r="${r*0.35}" fill="#fff"/>`).join('');
 }
 const body = c => `<path d="M26 220 Q28 166 100 160 Q172 166 174 220Z" fill="${c}"/>`;
-const ART = { // SVG fallbacks, unchanged from the prototype
+const ART = {
   mom(){
     const skin='#F3CBA5', hair='#8A5A2B', hi='#D9A860';
-    return `<svg viewBox="0 0 200 220" aria-hidden="true">
-      ${body('#FF6FA3')}
+    return `<svg viewBox="0 0 200 220" aria-hidden="true">${body('#FF6FA3')}
       <path d="M50 96 Q46 28 100 26 Q154 28 150 96 L160 198 Q142 212 128 196 L128 122 L72 122 L72 196 Q58 212 40 198Z" fill="${hair}"/>
       <path d="M58 120 Q54 160 52 196 M146 120 Q150 160 150 196" stroke="${hi}" stroke-width="7" fill="none" stroke-linecap="round"/>
-      <rect x="88" y="132" width="24" height="34" rx="10" fill="${skin}"/>
-      <ellipse cx="100" cy="98" rx="40" ry="46" fill="${skin}"/>
+      <rect x="88" y="132" width="24" height="34" rx="10" fill="${skin}"/><ellipse cx="100" cy="98" rx="40" ry="46" fill="${skin}"/>
       <path d="M58 96 Q52 38 100 36 Q148 38 142 96 Q138 62 106 54 Q84 74 58 96Z" fill="${hair}"/>
       <path d="M72 62 Q88 46 108 46" stroke="${hi}" stroke-width="5" fill="none" stroke-linecap="round"/>
       <path d="M76 86 Q84 81 92 86 M108 86 Q116 81 124 86" stroke="#6B4423" stroke-width="3" fill="none" stroke-linecap="round"/>
-      ${eyes(98,5.5)}
-      <path d="M76 95 l-5 -4 M124 95 l5 -4" stroke="#2B1B12" stroke-width="2.5" stroke-linecap="round"/>
+      ${eyes(98,5.5)}<path d="M76 95 l-5 -4 M124 95 l5 -4" stroke="#2B1B12" stroke-width="2.5" stroke-linecap="round"/>
       <circle cx="74" cy="112" r="7" fill="#F59BA8" opacity=".6"/><circle cx="126" cy="112" r="7" fill="#F59BA8" opacity=".6"/>
-      <path d="M86 118 Q100 131 114 118" stroke="#C04A63" stroke-width="4.5" fill="none" stroke-linecap="round"/>
-    </svg>`;
+      <path d="M86 118 Q100 131 114 118" stroke="#C04A63" stroke-width="4.5" fill="none" stroke-linecap="round"/></svg>`;
   },
   dad(){
     const skin='#A9683C', dark='#1C1512';
-    return `<svg viewBox="0 0 200 220" aria-hidden="true">
-      ${body('#3D8BFF')}
+    return `<svg viewBox="0 0 200 220" aria-hidden="true">${body('#3D8BFF')}
       <rect x="84" y="134" width="32" height="34" rx="10" fill="${skin}"/>
       <circle cx="55" cy="100" r="9" fill="${skin}"/><circle cx="145" cy="100" r="9" fill="${skin}"/>
       <ellipse cx="100" cy="98" rx="44" ry="48" fill="${skin}"/>
       <path d="M56 98 Q54 152 100 154 Q146 152 144 98 Q138 118 124 113 Q100 104 76 113 Q62 118 56 98Z" fill="${dark}"/>
       <path d="M80 119 Q100 142 120 119Z" fill="#fff"/>
       <path d="M58 86 Q60 46 100 46 Q140 46 142 86 Q120 66 100 66 Q80 66 58 86Z" fill="${dark}"/>
-      ${ring(100,88,46,11,-172,-8,18,dark)}
-      ${ring(100,84,30,11,-160,-20,28,dark)}
+      ${ring(100,88,46,11,-172,-8,18,dark)}${ring(100,84,30,11,-160,-20,28,dark)}
       <path d="M74 84 Q84 78 93 84 M107 84 Q116 78 126 84" stroke="${dark}" stroke-width="4" fill="none" stroke-linecap="round"/>
-      ${eyes(95,5.5)}
-      <path d="M94 106 Q100 111 106 106" stroke="#7A4526" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-    </svg>`;
+      ${eyes(95,5.5)}<path d="M94 106 Q100 111 106 106" stroke="#7A4526" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg>`;
   },
   kid(){
     const skin='#DDA273', hair='#5A3320';
-    return `<svg viewBox="0 0 200 220" aria-hidden="true">
-      ${body('#FFC93C')}
-      ${ring(100,102,52,16,-215,35,19,hair)}
-      ${ring(100,96,36,16,-180,0,30,hair)}
-      <rect x="88" y="138" width="24" height="30" rx="10" fill="${skin}"/>
-      <ellipse cx="100" cy="108" rx="40" ry="39" fill="${skin}"/>
+    return `<svg viewBox="0 0 200 220" aria-hidden="true">${body('#FFC93C')}
+      ${ring(100,102,52,16,-215,35,19,hair)}${ring(100,96,36,16,-180,0,30,hair)}
+      <rect x="88" y="138" width="24" height="30" rx="10" fill="${skin}"/><ellipse cx="100" cy="108" rx="40" ry="39" fill="${skin}"/>
       ${ring(100,104,40,9,-150,-30,24,hair)}
       <path d="M100 44 l-20 -12 v24Z M100 44 l20 -12 v24Z" fill="#FF6FA3"/><circle cx="100" cy="44" r="6" fill="#E84C88"/>
-      ${eyes(108,7)}
-      <circle cx="72" cy="122" r="8" fill="#F59BA8" opacity=".65"/><circle cx="128" cy="122" r="8" fill="#F59BA8" opacity=".65"/>
-      <path d="M90 126 Q100 135 110 126" stroke="#B5485A" stroke-width="4" fill="none" stroke-linecap="round"/>
-    </svg>`;
+      ${eyes(108,7)}<circle cx="72" cy="122" r="8" fill="#F59BA8" opacity=".65"/><circle cx="128" cy="122" r="8" fill="#F59BA8" opacity=".65"/>
+      <path d="M90 126 Q100 135 110 126" stroke="#B5485A" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`;
   }
 };
-// pose: 'idle' or 'cheer'. A character uses PNGs only if its idle PNG loaded;
-// a missing cheer PNG falls back to the idle PNG (the jump animation still plays).
-function charHTML(h, pose){
-  let art;
-  if (IMG_OK[h.file + '_idle']){
-    const file = (pose === 'cheer' && IMG_OK[h.file + '_cheer']) ? h.file + '_cheer' : h.file + '_idle';
-    art = `<div class="sprite"><img src="assets/img/${file}.png" alt="" draggable="false"></div>`;
-  } else {
-    art = ART[h.id]();
-  }
-  return art + `<div class="name">${h.name}</div>`;
+const IMG = {}; // 'cay_idle' -> url, or null if it failed to load (then SVG is used)
+function loadImg(src){
+  return new Promise(res => { const i = new Image(); i.onload = () => res(src); i.onerror = () => res(null); i.src = src; });
 }
-// Home screen line-up: Cay stands in the middle. (Level hosts still rotate in HOSTS order.)
-const HOME_ORDER = ['mom','kid','dad'].map(id => HOSTS.find(h => h.id === id));
-function fillFamily(el, anim, pose, order = HOSTS){
-  el.innerHTML = order.map(h =>
-    `<div class="char ${anim} ${h.id === 'kid' ? 'kid' : ''}">${charHTML(h, pose)}</div>`).join('');
+function preloadImages(){
+  const keys = HOSTS.flatMap(h => [h.file + '_idle', h.file + '_cheer']);
+  const all = Promise.all(keys.map(async k => { IMG[k] = await loadImg(`assets/img/${k}.png`); }));
+  return Promise.race([all, new Promise(r => setTimeout(r, 8000))]); // never trap the game on loading
 }
-
-/* =====================================================================
-   Audio engine (Web Audio API)
-   Why Web Audio and not <audio>: toddlers tap fast, and <audio> elements
-   lag and overlap on iOS. Decoded buffers start instantly and can be cut off.
-
-   Three channels:  voice (one clip at a time, interruptible)
-                    fx    (the rising tap notes and fanfare)
-                    music (looping, ducked while a voice is talking)
-   ===================================================================== */
-const store = {
-  get(k, dflt){ try{ const v = localStorage.getItem(k); return v === null ? dflt : v === '1'; }catch(e){ return dflt; } },
-  set(k, v){ try{ localStorage.setItem(k, v ? '1' : '0'); }catch(e){} }
-};
-let voiceOn = store.get('ccp.voice', true);   // voice + sound effects
-let musicOn = store.get('ccp.music', true);
-
-let actx = null, voiceGain, fxGain, musicGain;
-try{
-  // Created up front (it starts suspended) so clips can decode before Play is tapped.
-  // iOS only lets it make sound after resume() is called inside a tap: see unlock().
-  actx = new (window.AudioContext || window.webkitAudioContext)();
-  voiceGain = actx.createGain(); voiceGain.gain.value = 1;          voiceGain.connect(actx.destination);
-  fxGain    = actx.createGain(); fxGain.gain.value = 0.22;          fxGain.connect(actx.destination);
-  musicGain = actx.createGain(); musicGain.gain.value = MUSIC_BASE; musicGain.connect(actx.destination);
-}catch(e){ actx = null; }
-
-const CLIPS = ['welcome','finale','music'];
-for (let i = 1; i <= 10; i++) CLIPS.push('num_' + i, 'tap_' + i);
-for (let i = 1; i <= 4; i++) CLIPS.push('yay_' + i);
-
-const buf = {};      // key -> decoded AudioBuffer (only for clips that loaded)
-const loading = {};  // key -> promise that always resolves, loaded or not
-CLIPS.forEach(k => {
-  loading[k] = !actx ? Promise.resolve() :
-    fetch(`assets/audio/${k}.mp3`)
-      .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
-      .then(ab => new Promise(done => actx.decodeAudioData(ab, b => { buf[k] = b; done(); }, () => done())))
-      .catch(() => {})   // missing or broken file: leave buf[k] empty, speech fallback takes over
-      .then(() => { if (k === 'music') syncMusic(); });
-});
-
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let ctxReady = Promise.resolve();
-// Must be called from inside a tap handler.
-function unlock(){
-  if (!actx || actx.state === 'running') return;
-  try{ ctxReady = Promise.race([actx.resume(), sleep(800)]).catch(() => {}); }catch(e){}
+function art(h, pose){
+  const url = IMG[h.file + '_' + pose] || IMG[h.file + '_idle'];
+  return url ? `<img src="${url}" alt="" draggable="false">` : ART[h.id]();
 }
+const FAMILY_ORDER = ['mom', 'kid', 'dad']; // Cay stands in the middle on home and finale
+function fillFamily(el, cls, pose){
+  el.innerHTML = FAMILY_ORDER.map(id => HOSTS.find(h => h.id === id)).map(h =>
+    `<div class="char ${cls} ${h.id === 'kid' ? 'kid' : ''}">${art(h, pose)}<div class="name">${h.name}</div></div>`).join('');
+}
+const KID = HOSTS.find(h => h.id === 'kid');
 
-/* ----- fx ----- */
-function tone(freq, dur = 0.18){
-  if (!voiceOn || !actx || actx.state !== 'running') return;
+/* ---------- Settings (guarded localStorage: private mode can throw) ---------- */
+function load(k, d){ try{ const v = localStorage.getItem('cca_' + k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } }
+function save(k, v){ try{ localStorage.setItem('cca_' + k, JSON.stringify(v)); }catch(e){} }
+let soundOn = load('sound', true), musicOn = load('music', true), mode = load('mode', 'drag');
+
+/* ---------- Audio: recorded clips via Web Audio, browser speech as fallback ---------- */
+const CLIPS = ['welcome','finale','music','count_them','yay_1','yay_2','yay_3','yay_4',
+  ...Array.from({length:10}, (_, i) => 'num_' + (i + 1)),
+  ...Array.from({length:10}, (_, i) => 'find_' + (i + 1))]; // "Find 3 balloons!" level instructions
+const raw = {}, buf = {}, ready = {}; // ready[name] resolves once that clip is decoded (or failed)
+CLIPS.forEach(n => raw[n] = fetch(`assets/audio/${n}.mp3`).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null));
+let ctx = null, voiceGain, sfxGain, musicGain, musicSrc = null, voiceSrc = null, voiceDone = null;
+
+function initAudio(){ // must run inside the Play tap (iPad unlocks audio only from a gesture)
+  if (ctx) { ctx.resume(); return; }
   try{
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.type = 'triangle'; o.frequency.value = freq;
-    g.gain.setValueAtTime(1, actx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-    o.connect(g); g.connect(fxGain);
-    o.start(); o.stop(actx.currentTime + dur);
-  }catch(e){}
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    voiceGain = ctx.createGain(); sfxGain = ctx.createGain(); musicGain = ctx.createGain();
+    musicGain.gain.value = MUSIC_VOL;
+    [voiceGain, sfxGain, musicGain].forEach(g => g.connect(ctx.destination));
+    // Unlock iOS with a silent blip inside the gesture.
+    const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start();
+    CLIPS.forEach(n => ready[n] = (async () => {
+      const ab = await raw[n]; if (!ab) return;
+      try{ buf[n] = await ctx.decodeAudioData(ab); }catch(e){}
+      if (n === 'music') startMusic();
+    })());
+  }catch(e){ ctx = null; }
 }
-function fanfare(){ [523,659,784,1047].forEach((f,i) => setTimeout(() => tone(f, .25), i*130)); }
+function duck(on){
+  if (!ctx) return;
+  const g = musicGain.gain, t = ctx.currentTime;
+  g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+  g.linearRampToValueAtTime(on ? MUSIC_DUCK : MUSIC_VOL, t + (on ? 0.08 : 0.3));
+}
+function startMusic(){
+  if (!ctx || !buf.music || musicSrc || !musicOn || !$('home') || $('home').classList.contains('on')) return;
+  musicSrc = ctx.createBufferSource(); musicSrc.buffer = buf.music; musicSrc.loop = true;
+  musicSrc.connect(musicGain); musicSrc.start();
+}
+function stopMusic(){ if (musicSrc){ try{ musicSrc.stop(); }catch(e){} musicSrc = null; } }
 
-/* ----- voice -----
-   speak(key, text) plays assets/audio/<key>.mp3, or says `text` with the
-   browser voice if that clip is unavailable. Only one voice plays at a time:
-   calling speak() again cuts off whatever was talking (nothing is queued).
-   Returns a promise: true = finished on its own, false = was cut off.   */
-let current = null;
-function halt(){ if (current) current.stop(); }
-function speak(key, text){
-  halt();
-  if (!voiceOn) return Promise.resolve(true);
+function stopVoice(){
+  if (voiceSrc){ voiceSrc.onended = null; try{ voiceSrc.stop(); }catch(e){} voiceSrc = null; }
+  try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(e){}
+  if (voiceDone){ const d = voiceDone; voiceDone = null; d(); }
+}
+// Plays a recorded clip (or speaks `text` if the clip is missing). Interrupts any
+// earlier line so fast pickups never queue up. Always resolves, even on errors.
+function playVoice(name, text){
+  stopVoice();
+  if (!soundOn) return Promise.resolve();
   return new Promise(resolve => {
-    let src = null, usedSpeech = false, watchdog = null;
-    const me = { done:false, stop(){ finish(false); } };
-    function finish(ok){
-      if (me.done) return;
-      me.done = true;
-      clearTimeout(watchdog);
-      if (src){ src.onended = null; try{ src.stop(); }catch(e){} }
-      if (usedSpeech) try{ speechSynthesis.cancel(); }catch(e){}
-      if (current === me){ current = null; duck(false); }
-      resolve(ok);
-    }
-    current = me;
-    duck(true);
-    // Wait (briefly) for this clip to finish loading and for the audio unlock.
-    Promise.all([Promise.race([loading[key], sleep(1500)]), ctxReady]).then(() => {
-      if (me.done) return;                       // cut off while waiting
-      if (buf[key] && actx && actx.state === 'running'){
-        src = actx.createBufferSource();
-        src.buffer = buf[key];
-        src.connect(voiceGain);
-        src.onended = () => finish(true);
-        src.start();
-        // Safety net: never wait forever on an "ended" event that does not come.
-        watchdog = setTimeout(() => finish(true), buf[key].duration * 1000 + 600);
-      } else {
-        // Fallback: browser speech for this one event.
-        const synth = window.speechSynthesis;
-        if (!synth || !window.SpeechSynthesisUtterance){ watchdog = setTimeout(() => finish(true), 350); return; }
-        try{
-          usedSpeech = true;
-          synth.cancel();
-          const u = new SpeechSynthesisUtterance(text);
-          u.rate = 0.9; u.pitch = 1.2; u.lang = 'en-US';
-          u.onend = u.onerror = () => finish(true);
-          synth.speak(u);
-          watchdog = setTimeout(() => finish(true), 900 + text.length * 90);
-        }catch(e){ finish(true); }
-      }
-    });
+    let finished = false;
+    const done = () => { if (finished) return; finished = true; if (voiceDone === done) voiceDone = null; duck(false); resolve(); };
+    voiceDone = done; duck(true);
+    if (ctx && name && buf[name]){
+      const s = ctx.createBufferSource(); s.buffer = buf[name]; s.connect(voiceGain);
+      s.onended = () => { if (voiceSrc === s) voiceSrc = null; done(); };
+      voiceSrc = s; s.start();
+      setTimeout(done, buf[name].duration * 1000 + 600);
+    } else if (text && window.speechSynthesis){
+      try{
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.85; u.pitch = 1.2; u.lang = 'en-US';
+        u.onend = done; u.onerror = done;
+        window.speechSynthesis.speak(u);
+      }catch(e){ done(); }
+      setTimeout(done, 1500 + text.length * 110); // speech can silently never finish
+    } else done();
   });
 }
-
-/* ----- music ----- */
-let musicSrc = null, musicWanted = false;
-function duck(down){
-  if (!musicGain) return;
+function tone(freq, dur = 0.18){
+  if (!soundOn || !ctx) return;
   try{
-    const g = musicGain.gain, t = actx.currentTime;
-    g.cancelScheduledValues(t);
-    g.setValueAtTime(g.value, t);
-    g.linearRampToValueAtTime(down ? MUSIC_DUCKED : MUSIC_BASE, t + (down ? 0.08 : 0.3)); // 300ms recovery
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'triangle'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.25, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    o.connect(g); g.connect(sfxGain); o.start(); o.stop(ctx.currentTime + dur);
   }catch(e){}
 }
-// Starts or stops the loop so it matches: on a play screen + music toggle on + file loaded.
-function syncMusic(){
-  const should = musicWanted && musicOn && actx && buf.music;
-  if (should && !musicSrc){
-    try{
-      const b = buf.music, s = actx.createBufferSource();
-      s.buffer = b; s.loop = true;
-      // MP3 encoders pad the file with a little silence, which would click or gap on
-      // every repeat. If the decoded file is longer than the phrase, loop only the phrase.
-      const extra = MUSIC_LOOP_SECONDS ? b.duration - MUSIC_LOOP_SECONDS : 0;
-      if (extra > 0.002){
-        s.loopStart = Math.min(extra, 1105 / b.sampleRate); // typical MP3 lead-in
-        s.loopEnd = s.loopStart + MUSIC_LOOP_SECONDS;
-      }
-      s.connect(musicGain);
-      s.start(0, s.loopStart || 0);
-      musicSrc = s;
-    }catch(e){ musicSrc = null; }
-  } else if (!should && musicSrc){
-    try{ musicSrc.stop(); }catch(e){}
-    musicSrc = null;
-  }
-}
+function fanfare(){ [523,659,784,1047].forEach((f, i) => setTimeout(() => tone(f, .25), i * 130)); }
+let lastYay = 0;
+function yay(){ let k; do{ k = 1 + Math.floor(Math.random() * 4); }while(k === lastYay); lastYay = k; return 'yay_' + k; }
 
-/* =====================================================================
-   Game
-   runId guards every delayed step: Home, Again or a new level bumps it,
-   and any older timer or audio callback sees the mismatch and does nothing.
-   ===================================================================== */
+/* ---------- Game state ---------- */
 const $ = id => document.getElementById(id);
-let level = 1, count = 0, runId = 0, lastYay = 0, screen = 'home';
+const field = $('field'), cayEl = $('cay');
+let level = 1, count = 0, run = 0, phase = 'idle', welcomed = false;
+let items = [], F = { w:0, h:0 }, itemS = 80, cayS = 140;
+const cay = { x:0, y:0, face:1, lastMove:0 };
+let target = null, lastProgress = 0, hintItem = null;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-function show(id){
-  screen = id;
-  document.body.dataset.screen = id;
-  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-}
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 function drawDots(){
   $('dots').innerHTML = Array.from({length:10}, (_, i) => {
     const n = i + 1;
     return `<div class="dot ${n < level ? 'done' : n === level ? 'now' : ''}">${n}</div>`;
   }).join('');
 }
-function setHost(host, anim, pose){
-  $('host').className = `char ${anim} ${host.id === 'kid' ? 'kid' : ''}`;
-  $('host').innerHTML = charHTML(host, pose);
+function setHost(h, pose){
+  $('host').className = 'char ' + (pose === 'cheer' ? 'jump' : 'bob');
+  $('host').innerHTML = art(h, pose);
 }
-function newGame(){
-  unlock();
-  musicWanted = true; syncMusic();
-  show('game');
-  startLevel(1, true);
+function setCayPose(pose){ $('cayArt').innerHTML = art(KID, pose); }
+
+function measure(){
+  const r = field.getBoundingClientRect();
+  const old = { ...F };
+  F = { w:r.width - 10, h:r.height - 10 }; // minus the white border
+  const m = Math.min(F.w, F.h);
+  itemS = Math.max(54, Math.min(130, m * (level <= 4 ? 0.2 : 0.15)));
+  cayS  = Math.max(100, Math.min(240, m * 0.42));
+  cayEl.style.width = cayS + 'px';
+  if (old.w > 0 && (old.w !== F.w || old.h !== F.h)){ // rescale so nothing ends up off-screen
+    const sx = F.w / old.w, sy = F.h / old.h;
+    cay.x *= sx; cay.y *= sy;
+    items.forEach(it => { it.x *= sx; it.y *= sy; });
+    if (target){ target.x *= sx; target.y *= sy; }
+  }
+  items.forEach(drawItem);
+  clampCay(); drawCay();
 }
-async function startLevel(n, fresh){
-  const id = ++runId;
-  level = n; count = 0;
+new ResizeObserver(() => { if ($('game').classList.contains('on')) measure(); }).observe(field);
+
+function clampCay(){
+  const mx = cayS * 0.32, my = cayS * 0.4;
+  cay.x = Math.max(mx, Math.min(F.w - mx, cay.x));
+  cay.y = Math.max(my, Math.min(F.h - my, cay.y));
+}
+function drawCay(){
+  cayEl.style.transform = `translate(${cay.x - cayS / 2}px,${cay.y - cayS / 2}px)`;
+  $('cayArt').style.transform = `scaleX(${cay.face})`;
+}
+function drawItem(it){
+  it.el.style.width = it.el.style.height = itemS + 'px';
+  it.el.style.fontSize = (itemS * 0.68) + 'px';
+  const t = `translate(${it.x - itemS / 2}px,${it.y - itemS / 2}px)`;
+  it.el.style.transform = t; it.el.style.setProperty('--t', t);
+}
+function moveBy(dx, dy){
+  if (!dx && !dy) return;
+  cay.x += dx; cay.y += dy; clampCay();
+  if (Math.abs(dx) > 0.5) cay.face = dx < 0 ? -1 : 1;
+  cay.lastMove = performance.now();
+}
+
+function placeItems(n){
+  const pts = [], pad = itemS * 0.6, minD = itemS * 1.25;
+  for (let i = 0; i < n; i++){
+    let best = null, bestScore = -Infinity;
+    for (let t = 0; t < 250; t++){
+      const p = { x: pad + Math.random() * (F.w - 2 * pad), y: pad + Math.random() * (F.h - 2 * pad) };
+      let d = Math.hypot(p.x - cay.x, p.y - cay.y) - cayS * 0.9; // not right on top of Cay
+      for (const q of pts) d = Math.min(d, Math.hypot(p.x - q.x, p.y - q.y) - minD);
+      if (d > bestScore){ bestScore = d; best = p; }
+      if (d > 0 && t > 25) break;
+    }
+    pts.push(best);
+  }
+  return pts;
+}
+
+function startLevel(n){
+  run++; const my = run;
+  level = n; count = 0; phase = 'play'; target = null; hintItem = null;
   const host = HOSTS[(n - 1) % HOSTS.length];
   const [emoji, one, many] = THINGS[n - 1];
   const word = n === 1 ? one : many;
 
-  drawDots();
-  setHost(host, 'bob', 'idle');
-  $('bubble').textContent = `Tap the ${word}!`;
-  $('bigNum').textContent = '';
-  $('bigNum').style.color = COLORS[n - 1];
+  drawDots(); setHost(host, 'idle'); setCayPose('idle');
+  $('bubble').textContent = `Find ${n} ${word}!`;
+  $('bigNum').textContent = '0'; $('bigNum').style.color = COLORS[n - 1];
+  $('tray').innerHTML = Array.from({length:n}, (_, i) =>
+    `<div class="slot" style="--c:${COLORS[i]}"><span class="ghost">${emoji}</span><span class="n">${i + 1}</span></div>`).join('');
+  $('arrow').classList.remove('on'); $('target').classList.remove('on');
 
-  const box = $('items');
-  box.className = n <= 4 ? 'few' : '';
-  box.innerHTML = '';
-  for (let i = 0; i < n; i++){
-    const b = document.createElement('button');
-    b.className = 'item';
-    b.style.setProperty('--c', COLORS[i]);
-    b.style.animationDelay = (-Math.random() * 1.8) + 's';
-    b.innerHTML = `${emoji}<span class="badge"></span>`;
-    b.addEventListener('pointerdown', () => tapItem(b), { once:true });
-    box.appendChild(b);
-  }
-  // New game: welcome, then the instruction. A tap on an item cuts either one off
-  // (speak() returns false), and then the instruction is skipped.
-  if (fresh){
-    const finished = await speak('welcome', LINES.welcome);
-    if (!finished || id !== runId) return;
-  }
-  speak('tap_' + n, `Tap the ${word}!`);
+  items.forEach(it => it.el.remove()); items = [];
+  F = { w:0, h:0 }; measure();
+  cay.x = F.w / 2; cay.y = F.h - cayS * 0.45; cay.face = 1; clampCay(); drawCay();
+  placeItems(n).forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'thing';
+    el.innerHTML = `<div class="in" style="animation-delay:${(-Math.random() * 1.8).toFixed(2)}s">${emoji}</div>`;
+    field.appendChild(el);
+    const it = { el, x:p.x, y:p.y, done:false }; items.push(it); drawItem(it);
+  });
+  lastProgress = performance.now();
+
+  (async () => {
+    if (n === 1 && !welcomed){
+      welcomed = true;
+      // Decoding starts at the Play tap, so give the first clips a moment to be
+      // ready instead of falling back to the robot voice.
+      await Promise.race([Promise.all([ready.welcome, ready.find_1]), sleep(2000)]);
+      if (my !== run || count > 0) return;
+      await playVoice('welcome', `Hi ${KID_NAME}! Let's count!`);
+      if (my !== run || count > 0) return;
+    }
+    if (count === 0) playVoice('find_' + n, `Find ${n} ${word}!`);
+  })();
 }
-function tapItem(b){
-  if (b.classList.contains('done')) return;
-  unlock();
-  count++;
-  b.classList.add('done');
-  b.style.animationDelay = '0s';
-  b.querySelector('.badge').textContent = count;
+
+let lastNumVoice = Promise.resolve();
+function collect(it){
+  it.done = true; count++; const k = count;
+  lastProgress = performance.now();
+  if (hintItem){ hintItem.el.classList.remove('hint'); hintItem = null; $('arrow').classList.remove('on'); }
+
+  tone(NOTES[k - 1]);
+  lastNumVoice = playVoice('num_' + k, String(k));
   const big = $('bigNum');
-  big.textContent = count;
-  big.classList.remove('pop'); void big.offsetWidth; big.classList.add('pop');
-  tone(NOTES[count - 1]);
-  const said = speak('num_' + count, NUMBER_WORDS[count - 1] + '!');
-  if (count === level){
-    // Let the last number finish before the praise (and wait at least a beat with sound off).
-    const id = runId;
-    Promise.all([said, sleep(600)]).then(() => { if (id === runId) levelDone(id); });
-  }
+  big.textContent = k; big.classList.remove('pop'); void big.offsetWidth; big.classList.add('pop');
+
+  // sparkle where it was picked up
+  const b = document.createElement('div'); b.className = 'burst';
+  b.style.left = it.x + 'px'; b.style.top = it.y + 'px'; b.style.borderColor = COLORS[k - 1];
+  field.appendChild(b); setTimeout(() => b.remove(), 600);
+
+  // fly a copy into its tray slot so she sees the pile grow
+  const from = it.el.getBoundingClientRect();
+  const slot = $('tray').children[k - 1], to = slot.getBoundingClientRect();
+  const f = document.createElement('div'); f.className = 'flyer';
+  f.textContent = THINGS[level - 1][0];
+  f.style.width = f.style.height = from.width + 'px'; f.style.fontSize = (from.width * 0.68) + 'px';
+  f.style.transform = `translate(${from.left}px,${from.top}px)`;
+  document.body.appendChild(f);
+  it.el.classList.add('gone');
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const sc = to.width / from.width;
+    f.style.transform = `translate(${to.left + (to.width - from.width) / 2}px,${to.top + (to.height - from.height) / 2}px) scale(${sc})`;
+  }));
+  setTimeout(() => { f.remove(); slot.classList.add('filled'); }, 560);
+
+  if (count === level){ phase = 'counting'; target = null; $('target').classList.remove('on'); finishLevel(run); }
 }
-async function levelDone(id){
-  const host = HOSTS[(level - 1) % HOSTS.length];
-  setHost(host, 'jump', 'cheer');
-  $('bubble').textContent = `${level}! Yay!`;
+
+// The teaching moment: count the tray again, one by one, then say the total.
+async function finishLevel(my){
+  const [, one, many] = THINGS[level - 1];
+  const word = level === 1 ? one : many;
+  await lastNumVoice; await sleep(500); if (my !== run) return;
+  cayEl.classList.remove('walking');
+  if (level > 1){
+    $('bubble').textContent = "Let's count them!";
+    const slots = [...$('tray').children];
+    await playVoice('count_them', "Let's count them!");
+    for (let i = 0; i < level; i++){
+      if (my !== run) return;
+      slots.forEach(s => s.classList.remove('say'));
+      slots[i].classList.add('say');
+      $('bigNum').textContent = i + 1;
+      tone(NOTES[i], .12);
+      await Promise.all([playVoice('num_' + (i + 1), String(i + 1)), sleep(550)]);
+    }
+    if (my !== run) return;
+    slots.forEach(s => s.classList.remove('say'));
+  }
+  $('bubble').textContent = `${level} ${word}! Yay!`;
+  setHost(HOSTS[(level - 1) % HOSTS.length], 'cheer'); setCayPose('cheer');
   fanfare(); confetti(30);
-  let pick; do { pick = 1 + Math.floor(Math.random() * 4); } while (pick === lastYay);
-  lastYay = pick;
-  speak('yay_' + pick, LINES['yay_' + pick]);
-  await sleep(3200);
-  if (id !== runId) return;
+  await Promise.all([playVoice(yay(), `Great job, ${KID_NAME}!`), sleep(1800)]);
+  await sleep(700);
+  if (my !== run) return;
   level < 10 ? startLevel(level + 1) : win();
 }
+
 function win(){
-  ++runId;
+  run++; phase = 'win';
+  items.forEach(it => it.el.remove()); items = [];
   show('win');
   fillFamily($('winFamily'), 'jump', 'cheer');
   $('row10').innerHTML = '';
   for (let n = 1; n <= 10; n++){
     const b = document.createElement('button');
     b.textContent = n; b.style.background = COLORS[n - 1];
-    b.addEventListener('pointerdown', () => { unlock(); tone(NOTES[n - 1]); speak('num_' + n, NUMBER_WORDS[n - 1] + '!'); });
+    b.addEventListener('pointerdown', () => { tone(NOTES[n - 1]); playVoice('num_' + n, String(n)); });
     $('row10').appendChild(b);
   }
   fanfare(); confetti(90);
-  speak('finale', LINES.finale);
+  playVoice('finale', `You counted all the way to ten! Way to go, ${KID_NAME}!`);
 }
 function confetti(n){
   for (let i = 0; i < n; i++){
@@ -570,52 +613,134 @@ function confetti(n){
   }
 }
 function goHome(){
-  ++runId;               // cancels any pending level change
-  halt();
-  musicWanted = false; syncMusic();
+  run++; phase = 'idle'; stopVoice(); stopMusic(); target = null;
   show('home');
 }
 
-/* ----- controls ----- */
-function paintToggles(){
-  $('voiceBtn').classList.toggle('off', !voiceOn);
-  $('musicBtn').classList.toggle('off', !musicOn);
+/* ---------- Main loop: walking, pickups, hints ---------- */
+const keys = new Set();
+let lastT = performance.now();
+function frame(t){
+  const dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
+  if (phase === 'play') step(dt, t);
+  requestAnimationFrame(frame);
 }
-$('voiceBtn').addEventListener('click', () => {
-  voiceOn = !voiceOn; store.set('ccp.voice', voiceOn);
-  if (!voiceOn) halt();
-  paintToggles();
-});
-$('musicBtn').addEventListener('click', () => {
-  unlock();
-  musicOn = !musicOn; store.set('ccp.music', musicOn);
-  syncMusic(); paintToggles();
-});
-$('play').addEventListener('click', newGame);
-$('again').addEventListener('click', newGame);
-$('goHome').addEventListener('click', goHome);
-
-// Pause all sound when the page is hidden; pick back up when it returns.
-document.addEventListener('visibilitychange', () => {
-  if (!actx) return;
-  if (document.hidden){
-    try{ window.speechSynthesis && speechSynthesis.cancel(); }catch(e){}
-    actx.suspend().catch(() => {});
-  } else if (screen !== 'home'){
-    actx.resume().catch(() => {});
+function step(dt, now){
+  const sp = WALK_SPEED * Math.max(F.h, F.w * 0.6) * dt; // wide iPad meadows need a faster walk
+  if (keys.size){ // arrow keys, handy for testing on a laptop
+    let vx = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
+    let vy = (keys.has('ArrowDown') ? 1 : 0) - (keys.has('ArrowUp') ? 1 : 0);
+    const d = Math.hypot(vx, vy); if (d) moveBy(vx / d * sp, vy / d * sp);
+  } else if (target){
+    const dx = target.x - cay.x, dy = target.y - cay.y, d = Math.hypot(dx, dy);
+    if (d <= sp){ moveBy(dx, dy); if (!dragging) { target = null; $('target').classList.remove('on'); } }
+    else moveBy(dx / d * sp, dy / d * sp);
   }
+  cayEl.classList.toggle('walking', now - cay.lastMove < 120);
+  drawCay();
+
+  const reach = cayS * 0.36 + itemS * 0.38;
+  for (const it of items) if (!it.done && Math.hypot(it.x - cay.x, it.y - cay.y) < reach){ collect(it); if (phase !== 'play') return; }
+
+  // Stuck? Point the way to the nearest item.
+  if (now - lastProgress > HINT_AFTER){
+    let best = null, bd = Infinity;
+    for (const it of items) if (!it.done){ const d = Math.hypot(it.x - cay.x, it.y - cay.y); if (d < bd){ bd = d; best = it; } }
+    if (best !== hintItem){ if (hintItem) hintItem.el.classList.remove('hint'); hintItem = best; if (best) best.el.classList.add('hint'); }
+    if (best){
+      const a = Math.atan2(best.y - cay.y, best.x - cay.x), r = cayS * 0.62;
+      const ar = $('arrow'); ar.classList.add('on');
+      ar.style.transform = `translate(${cay.x + Math.cos(a) * r}px,${cay.y + Math.sin(a) * r}px) rotate(${a}rad)`;
+    }
+  }
+}
+requestAnimationFrame(frame);
+
+/* ---------- Input: drag in the meadow ---------- */
+let dragging = false;
+function local(e){ const r = field.getBoundingClientRect(); return { x: e.clientX - r.left - 5, y: e.clientY - r.top - 5 }; }
+function setTarget(e){
+  target = local(e);
+  const tg = $('target'); tg.classList.add('on');
+  tg.style.left = target.x + 'px'; tg.style.top = target.y + 'px';
+}
+field.addEventListener('pointerdown', e => {
+  if (phase !== 'play') return;
+  dragging = true; try{ field.setPointerCapture(e.pointerId); }catch(err){}
+  setTarget(e);
 });
-// iOS can leave the audio context "interrupted" after a call or app switch: any tap revives it.
-document.addEventListener('pointerdown', () => { if (screen !== 'home') unlock(); }, true);
-// Block pinch and double-tap zoom so little hands don't lose the screen.
+field.addEventListener('pointermove', e => { if (dragging && phase === 'play') setTarget(e); });
+const endDrag = () => { dragging = false; };
+field.addEventListener('pointerup', endDrag);
+field.addEventListener('pointercancel', endDrag);
+
+/* ---------- Input: touch pad (relative movement, like a laptop trackpad) ---------- */
+const pad = $('pad'); let padLast = null;
+function padDot(e){
+  const r = pad.getBoundingClientRect();
+  $('padDot').style.transform = `translate(${e.clientX - r.left}px,${e.clientY - r.top}px)`;
+}
+pad.addEventListener('pointerdown', e => {
+  try{ pad.setPointerCapture(e.pointerId); }catch(err){}
+  padLast = { x:e.clientX, y:e.clientY }; pad.classList.add('active'); padDot(e);
+  target = null; $('target').classList.remove('on');
+});
+pad.addEventListener('pointermove', e => {
+  if (!padLast) return;
+  padDot(e);
+  if (phase === 'play') moveBy((e.clientX - padLast.x) * PAD_GAIN, (e.clientY - padLast.y) * PAD_GAIN);
+  padLast = { x:e.clientX, y:e.clientY };
+});
+const endPad = () => { padLast = null; pad.classList.remove('active'); };
+pad.addEventListener('pointerup', endPad);
+pad.addEventListener('pointercancel', endPad);
+
+addEventListener('keydown', e => { if (e.key.startsWith('Arrow')){ keys.add(e.key); e.preventDefault(); } });
+addEventListener('keyup', e => keys.delete(e.key));
+addEventListener('blur', () => keys.clear());
+
+/* ---------- Buttons and settings ---------- */
+function applyMode(){
+  document.body.classList.toggle('padmode', mode === 'pad');
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('sel', b.dataset.mode === mode));
+  $('modeBtn').textContent = mode === 'pad' ? '👆' : '🖐️'; // shows what you'd switch TO
+  save('mode', mode);
+}
+function applySound(){
+  $('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+  $('musicBtn').classList.toggle('off', !musicOn);
+  save('sound', soundOn); save('music', musicOn);
+}
+document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => { mode = b.dataset.mode; applyMode(); }));
+$('modeBtn').addEventListener('click', () => { mode = mode === 'pad' ? 'drag' : 'pad'; applyMode(); });
+$('soundBtn').addEventListener('click', () => { soundOn = !soundOn; if (!soundOn) stopVoice(); applySound(); });
+$('musicBtn').addEventListener('click', () => { musicOn = !musicOn; musicOn ? startMusic() : stopMusic(); applySound(); });
+
+function begin(){
+  initAudio();
+  show('game');
+  startMusic();
+  requestAnimationFrame(() => startLevel(1)); // after layout so the meadow has a size
+}
+$('play').addEventListener('click', begin);
+$('again').addEventListener('click', begin);
+$('goHome').addEventListener('click', goHome);
+$('winHome').addEventListener('click', goHome);
+
+document.addEventListener('visibilitychange', () => {
+  if (!ctx) return;
+  document.hidden ? ctx.suspend() : ctx.resume();
+});
+// block pinch/double-tap zoom so little hands don't lose the screen
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('dblclick', e => e.preventDefault());
 
-/* ----- boot ----- */
-paintToggles();
+applyMode(); applySound();
+$('play').disabled = true; $('play').textContent = '…';
 preloadImages().then(() => {
-  fillFamily($('homeFamily'), 'bob', 'idle', HOME_ORDER);
-  $('play').disabled = false;
+  fillFamily($('homeFamily'), 'bob', 'idle');
+  setCayPose('idle');
+  $('play').disabled = false; $('play').textContent = '▶ Play';
 });
 </script>
 </body>
