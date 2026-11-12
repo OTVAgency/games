@@ -284,8 +284,10 @@ function charHTML(h, pose){
   }
   return art + `<div class="name">${h.name}</div>`;
 }
-function fillFamily(el, anim, pose){
-  el.innerHTML = HOSTS.map(h =>
+// Home screen line-up: Cay stands in the middle. (Level hosts still rotate in HOSTS order.)
+const HOME_ORDER = ['mom','kid','dad'].map(id => HOSTS.find(h => h.id === id));
+function fillFamily(el, anim, pose, order = HOSTS){
+  el.innerHTML = order.map(h =>
     `<div class="char ${anim} ${h.id === 'kid' ? 'kid' : ''}">${charHTML(h, pose)}</div>`).join('');
 }
 
@@ -603,7 +605,7 @@ document.addEventListener('dblclick', e => e.preventDefault());
 /* ----- boot ----- */
 paintToggles();
 preloadImages().then(() => {
-  fillFamily($('homeFamily'), 'bob', 'idle');
+  fillFamily($('homeFamily'), 'bob', 'idle', HOME_ORDER);
   $('play').disabled = false;
 });
 </script>
